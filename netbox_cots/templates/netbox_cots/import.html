@@ -1,7 +1,6 @@
 {% extends 'base/layout.html' %}
 {% block title %}Import des affectations COTS{% endblock %}
 {% block content %}
-{% if legacy_conversion %}<div class="alert alert-warning">Reprise des anciennes installations : ce CSV regroupe les versions identiques par rôle et réunit leurs tags. Les archives par machine sont conservées. Tous les membres actuels et futurs du rôle hériteront des COTS, y compris les machines non présentes dans l’ancien inventaire. Les notes individuelles restent dans les archives. Vérifier le CSV, puis simuler avant d’intégrer.</div>{% endif %}
 {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
 <div class="alert alert-info">Le CSV crée les COTS et versions manquants, puis ajoute ou actualise les affectations. Aucune affectation absente du fichier n'est supprimée. L'import est réservé aux superutilisateurs.</div>
 <div class="card mb-3"><h2 class="card-header">Importer un CSV</h2><div class="card-body">

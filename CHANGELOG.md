@@ -1,5 +1,13 @@
 # Historique des versions
 
+## 0.3.2
+
+- Retrait des menus et pages « Anciennes installations » et « Reprendre les anciennes installations ».
+- La fiche COTS renvoie désormais vers les affectations aux rôles.
+- Import CSV par rôle inchangé ; données historiques conservées en base et API d’export historique en lecture seule maintenue.
+- README actualisé. Aucune nouvelle migration.
+
+
 ## 0.3.1
 
 - Sélection API des machines avec le seul slug du COTS : tous rôles et toutes versions.

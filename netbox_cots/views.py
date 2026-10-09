@@ -17,7 +17,7 @@ from utilities.views import register_model_view, ViewTab
 from . import forms, tables, filtersets
 from .csv_parser import ImportFailure
 from .importer import import_csv
-from .models import Application, SoftwareVersion, Installation, RoleAssignment
+from .models import Application, SoftwareVersion, RoleAssignment
 
 
 class ApplicationListView(generic.ObjectListView):
@@ -70,20 +70,6 @@ class SoftwareVersionEditView(generic.ObjectEditView):
 
 class SoftwareVersionDeleteView(generic.ObjectDeleteView):
     queryset = SoftwareVersion.objects.all()
-
-
-class InstallationListView(generic.ObjectListView):
-    queryset = Installation.objects.select_related("application", "software_version", "device", "virtual_machine").prefetch_related("tags")
-    table = tables.LegacyInstallationTable
-    filterset = filtersets.InstallationFilterSet
-    filterset_form = forms.InstallationFilterForm
-    actions = (BulkExport,)
-
-
-class InstallationView(generic.ObjectView):
-    actions = ()
-    queryset = Installation.objects.select_related("application", "software_version", "device", "virtual_machine")
-    template_name = "netbox_cots/installation.html"
 
 
 class RoleAssignmentListView(generic.ObjectListView):
@@ -218,19 +204,6 @@ class CSVImportView(LoginRequiredMixin, View):
             cache.delete(lock_key)
         return render(request, "netbox_cots/import.html", {
             "form": form, "result": result, "preview_token": retry_token, "error": error,
-        })
-
-
-class CSVConvertLegacyView(CSVImportView):
-    def get(self, request):
-        from .legacy import legacy_role_csv
-        try:
-            text = legacy_role_csv()
-        except ImportFailure as exc:
-            return render(request, "netbox_cots/import.html", {"form": forms.CSVImportForm(), "error": str(exc)})
-        return render(request, "netbox_cots/import.html", {
-            "form": forms.CSVImportForm(initial={"csv_text": text}),
-            "legacy_conversion": True,
         })
 
 

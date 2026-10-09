@@ -173,6 +173,22 @@ class InventoryTests(TestCase):
             names.update((row['name'] for row in page['results']))
         self.assertEqual(names, {'PC-001', 'VM-001', 'PC-002'})
 
+    def test_removed_legacy_ui(self):
+        for name in ('installation_list', 'installation', 'convert_legacy'):
+            with self.assertRaises(NoReverseMatch):
+                reverse('plugins:netbox_cots:' + name, args=[1] if name == 'installation' else None)
+        from django.urls import resolve, Resolver404
+        for path in ('/plugins/cots/installations/', '/plugins/cots/installations/1/', '/plugins/cots/convert-legacy/'):
+            with self.assertRaises(Resolver404):
+                resolve(path)
+        from netbox_cots.navigation import menu
+        links = [item.link for group in menu.groups for item in group.items]
+        self.assertEqual(len(links), 5)
+        self.assertIn('plugins:netbox_cots:csv_import', links)
+        self.assertNotIn('plugins:netbox_cots:installation_list', links)
+        self.assertNotIn('plugins:netbox_cots:convert_legacy', links)
+        self.assertTrue(reverse('plugins-api:netbox_cots-api:installation-list'))
+
     def test_api_requires_application(self):
         req = APIRequestFactory().get('/api/plugins/cots/role-assignments/machines/', {'role': 'poste'})
         force_authenticate(req, user=user)

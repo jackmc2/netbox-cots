@@ -7,8 +7,8 @@
     <tr><th>Éditeur</th><td>{{ object.publisher|default:'-' }}</td></tr>
     <tr><th>Description</th><td>{{ object.description|default:'-' }}</td></tr>
   </table></div>
-  {% if perms.netbox_cots.view_installation %}
-  <a class="btn btn-primary mt-3" href="{% url 'plugins:netbox_cots:installation_list' %}?application_id={{ object.pk }}">Voir les machines utilisant ce COTS</a>
+  {% if perms.netbox_cots.view_roleassignment %}
+  <a class="btn btn-primary mt-3" href="{% url 'plugins:netbox_cots:roleassignment_list' %}?application_id={{ object.pk }}">Voir les rôles utilisant ce COTS</a>
   {% endif %}
 </div><div class="col-md-6">
   <div class="card"><h2 class="card-header">Versions</h2><ul class="list-group list-group-flush">

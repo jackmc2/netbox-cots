@@ -1,8 +1,8 @@
 # NetBox COTS — Affectations par rôle
 
-**Plugin :** `netbox_cots` · **Version :** `0.3.1` · **NetBox :** `4.4.0` à `4.7.2` inclus.
+**Plugin :** `netbox_cots` · **Version :** `0.3.2` · **NetBox :** `4.4.0` à `4.7.2` inclus.
 
-[Télécharger le wheel 0.3.1](https://github.com/jackmc2/netbox-cots/raw/refs/heads/main/packages/netbox_cots-0.3.1-py3-none-any.whl).
+[Télécharger le wheel 0.3.2](https://github.com/jackmc2/netbox-cots/raw/refs/heads/main/packages/netbox_cots-0.3.2-py3-none-any.whl).
 
 Les COTS/versions sont affectés aux **rôles d’appareil NetBox** (`dcim.DeviceRole`). Les appareils et VM portant ce rôle en héritent automatiquement. Ils affichent ces COTS en lecture seule. Aucune affectation individuelle ni exception par machine n’est possible dans le nouveau modèle.
 
@@ -14,14 +14,13 @@ Le même wheel est destiné à NetBox **4.4.0 à 4.7.2**. La cible du projet est
 
 **Depuis la 0.3.0, le CSV et les API d’écriture utilisent les rôles.** Les anciens CSV par machine ne sont plus acceptés. `/installations/` reste accessible en lecture seule pour les archives. Les nouvelles affectations utilisent `/role-assignments/`.
 
-La migration `0002_roleassignment` ajoute une table ; elle ne supprime ni ne convertit automatiquement les anciennes installations. Après mise à jour, reprendre les données selon la procédure ci-dessous ou créer les affectations par rôle.
+La migration `0002_roleassignment` ajoute une table ; elle ne supprime ni ne convertit automatiquement les anciennes installations. Créer les affectations aux rôles depuis l’interface, le CSV ou l’API.
 
 ## Sommaire
 
 - [Modèle et héritage](#modèle-et-héritage)
 - [Interface et permissions](#interface-et-permissions)
 - [Import CSV par rôle](#import-csv-par-rôle)
-- [Reprise des anciennes installations](#reprise-des-anciennes-installations)
 - [API et sélection des cibles Ansible](#api-et-sélection-des-cibles-ansible)
 - [Import en ligne de commande](#import-en-ligne-de-commande)
 - [Installation HAOS](#installation-et-mise-à-jour-sur-haos)
@@ -63,7 +62,7 @@ Les tableaux des machines n’ont aucun bouton d’ajout, de modification ou de 
 
 Pour un compte non superutilisateur, attribuer les permissions natives `view/add/change/delete` sur **RoleAssignment** selon le besoin, ainsi que les permissions sur les applications et versions. Les anciens droits sur Installation ne donnent pas automatiquement accès au nouveau modèle. Pour la sélection API, le compte doit voir les affectations, les rôles et les appareils/VM concernés ; les restrictions d’objets sont respectées.
 
-**Import CSV, reprise et purge globale : superutilisateurs uniquement.** Le menu **Vider les affectations** demande de saisir `SUPPRIMER`, puis efface toutes les affectations aux rôles dans une transaction. Il conserve les rôles, machines, COTS, versions et anciennes installations archivées. Sauvegarder les affectations avant une purge.
+**Import CSV et purge globale : superutilisateurs uniquement.** Le menu **Vider les affectations** demande de saisir `SUPPRIMER`, puis efface toutes les affectations aux rôles dans une transaction. Il conserve les rôles, machines, COTS, versions et anciennes installations archivées. Sauvegarder les affectations avant une purge.
 
 ## Import CSV par rôle
 
@@ -116,19 +115,13 @@ Les tags déjà associés au rôle/COTS sont conservés ; une colonne absente ou
 
 Un ajout de tags seul compte comme une affectation mise à jour. Le résultat distingue les objets tags créés et leurs associations ajoutées. Les tags ne modifient pas ceux du rôle lui-même, des machines ou des fiches COTS/version.
 
-## Reprise des anciennes installations
+## Données des anciennes versions
 
-Après mise à jour depuis 0.2.x :
+Depuis la 0.3.2, les menus et pages **Anciennes installations** et **Reprendre les anciennes installations** sont retirés. Les anciennes URL de ces pages renvoient HTTP 404. L’import CSV par rôle reste disponible avec simulation puis confirmation.
 
-1. Conserver une sauvegarde de la base.
-2. Ouvrir **COTS → Reprendre les anciennes installations** avec un superutilisateur.
-3. Le plugin prépare un CSV par rôle/COTS, à partir du rôle actuel des machines, en regroupant les versions identiques et en réunissant les tags.
-4. Vérifier le CSV prérempli : l’affectation concernera **tous les membres actuels et futurs du rôle**, même ceux absents de l’ancien inventaire.
-5. Simuler, puis intégrer avec le parcours habituel.
+Une mise à jour conserve les données historiques et leurs notes en base ; aucune migration de suppression n’est exécutée. L’API historique `/api/plugins/cots/installations/` reste en lecture seule pour exporter les archives. Elle ne reflète pas les COTS hérités des rôles. Les versions utilisées par ces archives restent protégées contre la suppression.
 
-La préparation est refusée si une machine n’a pas de rôle, si plusieurs versions d’un COTS existent dans le même rôle, si une affectation au rôle utilise déjà une autre version, ou si un nom de tag ne peut pas être représenté dans le CSV. Aucun choix de version n’est fait automatiquement. Séparer les machines en rôles adaptés ou préparer manuellement le CSV souhaité. Les restrictions de tags et limites du CSV sont ensuite vérifiées lors de la simulation.
-
-Les anciennes installations et leurs notes individuelles restent accessibles dans **Anciennes installations** et via l’API historique. Elles ne déterminent plus les COTS affichés sur les machines et ne sont plus modifiables par l’interface ou l’API du plugin. Les notes individuelles ne sont pas fusionnées dans les notes du rôle. Les versions référencées restent protégées. Aucune suppression des archives n’est exécutée par la migration, la reprise ou la purge des nouvelles affectations.
+Pour établir les affectations actuelles, préparer un CSV par rôle (slug ou ID) ou utiliser l’interface/API des affectations aux rôles. Il n’y a plus de parcours de reprise automatique dans l’interface.
 
 ## API et sélection des cibles Ansible
 
@@ -322,11 +315,11 @@ python manage.py import_cots roles-cots.csv --apply --user admin
 
 Pour l’application [Netbox de Casper Klein](https://github.com/casperklein/homeassistant-addons/tree/master/netbox).
 
-1. Déposer `netbox_cots-0.3.1-py3-none-any.whl` dans `/app_configs/0da538cf_netbox/`.
+1. Déposer `netbox_cots-0.3.2-py3-none-any.whl` dans `/app_configs/0da538cf_netbox/`.
 2. Dans le fichier `requirements.txt` de ce dossier, ajouter cette ligne, ou remplacer la ligne de l’ancienne version :
 
 ```text
-/config/netbox_cots-0.3.1-py3-none-any.whl
+/config/netbox_cots-0.3.2-py3-none-any.whl
 ```
 
 Le chemin `/config/` est celui vu depuis l’application NetBox. Conserver les
@@ -344,7 +337,7 @@ Si le plugin est déjà déclaré, ne pas ajouter une seconde fois cette ligne.
 5. Consulter le journal : installation du paquet, migrations éventuelles, puis démarrage de NetBox.
 6. Ouvrir NetBox et actualiser la page.
 
-Une mise à jour depuis 0.2.x nécessite la migration `0002_roleassignment` ; les anciennes installations sont conservées, puis peuvent être reprises depuis le menu dédié.
+Une mise à jour depuis 0.2.x nécessite la migration `0002_roleassignment` ; les anciennes installations sont conservées en base. Les affectations aux rôles sont créées via l’interface, le CSV ou l’API.
 L’application HAOS prend en charge l’installation des requirements et les
 migrations nécessaires au démarrage.
 
@@ -402,7 +395,7 @@ depuis un autre dossier : vous risqueriez d’agir sur un autre projet Compose.
 | Fichier, relatif au dossier du projet | Action |
 | --- | --- |
 | `.env` | Ajouter la référence de l’image de base, en conservant les autres variables |
-| `plugins/netbox_cots-0.3.1-py3-none-any.whl` | Copier le wheel téléchargé |
+| `plugins/netbox_cots-0.3.2-py3-none-any.whl` | Copier le wheel téléchargé |
 | `Dockerfile-Plugins` | Créer le fichier de construction de l’image |
 | `configuration/plugins.py` | Ajouter le plugin à la configuration NetBox |
 | `docker-compose.override.yml` | Définir l’image personnalisée pour le web et le worker |
@@ -465,12 +458,12 @@ mkdir -p plugins
 
 Copier le wheel téléchargé depuis votre ordinateur vers ce dossier sur le
 serveur Docker, par SFTP/SCP ou votre gestionnaire de fichiers. Le fichier doit
-rester nommé `netbox_cots-0.3.1-py3-none-any.whl` : ne pas le décompresser.
+rester nommé `netbox_cots-0.3.2-py3-none-any.whl` : ne pas le décompresser.
 
 Vérifier qu’il est présent :
 
 ```bash
-ls -l plugins/netbox_cots-0.3.1-py3-none-any.whl
+ls -l plugins/netbox_cots-0.3.2-py3-none-any.whl
 ```
 
 Si le fichier n’est pas trouvé, corriger le transfert avant de construire
@@ -485,9 +478,9 @@ ARG NETBOX_BASE_IMAGE
 FROM ${NETBOX_BASE_IMAGE}
 
 USER root
-COPY plugins/netbox_cots-0.3.1-py3-none-any.whl /opt/netbox/plugins/
+COPY plugins/netbox_cots-0.3.2-py3-none-any.whl /opt/netbox/plugins/
 RUN /usr/local/bin/uv pip install --python /opt/netbox/venv/bin/python \
-    /opt/netbox/plugins/netbox_cots-0.3.1-py3-none-any.whl
+    /opt/netbox/plugins/netbox_cots-0.3.2-py3-none-any.whl
 
 ARG NETBOX_RUNTIME_USER=root
 USER ${NETBOX_RUNTIME_USER}
@@ -502,7 +495,7 @@ image provenant d’un autre fournisseur, vérifier son environnement Python et 
 utilisateur. Le paquet est installé **à la construction de l’image**, ce qui
 le conserve lors d’une recréation du conteneur.
 
-Le plugin 0.3.1 contient des templates mais aucun fichier statique propre ;
+Le plugin 0.3.2 contient des templates mais aucun fichier statique propre ;
 aucune étape `collectstatic` supplémentaire n’est nécessaire pour ce paquet.
 
 ### 3. Déclarer le plugin
@@ -549,7 +542,7 @@ Utiliser des espaces, pas des tabulations, pour l’indentation YAML :
 ```yaml
 services:
   netbox:
-    image: netbox-cots-local:cots-0.3.1
+    image: netbox-cots-local:cots-0.3.2
     pull_policy: never
     build:
       context: .
@@ -559,11 +552,11 @@ services:
         NETBOX_RUNTIME_USER: ${NETBOX_RUNTIME_USER:-root}
 
   netbox-worker:
-    image: netbox-cots-local:cots-0.3.1
+    image: netbox-cots-local:cots-0.3.2
     pull_policy: never
 ```
 
-`netbox-cots-local:cots-0.3.1` est le nom **local** choisi pour l’image à
+`netbox-cots-local:cots-0.3.2` est le nom **local** choisi pour l’image à
 construire ; ce n’est pas une image à télécharger sur Docker Hub.
 
 Le web et le worker doivent charger le même plugin et la même configuration.
@@ -593,7 +586,7 @@ docker compose build netbox
 
 `config -q` ne produit normalement aucun texte en cas de réussite. S’il indique
 une erreur, corriger le YAML ou la variable manquante avant de continuer.
-`build netbox` doit se terminer sans erreur et installer `netbox-cots==0.3.1`.
+`build netbox` doit se terminer sans erreur et installer `netbox-cots==0.3.2`.
 La construction seule ne remplace pas les conteneurs en fonctionnement.
 
 Contrôler le paquet dans l’image construite, sans lancer le serveur ni migrer :
@@ -602,7 +595,7 @@ Contrôler le paquet dans l’image construite, sans lancer le serveur ni migrer
 docker compose run --rm --no-deps netbox /opt/netbox/venv/bin/python -c "from importlib.metadata import version; print(version('netbox-cots'))"
 ```
 
-Résultat attendu : `0.3.1`. Cette commande exécute Python dans un conteneur
+Résultat attendu : `0.3.2`. Cette commande exécute Python dans un conteneur
 temporaire utilisant l’image sélectionnée par Compose, puis le supprime.
 
 Quand la construction réussit, arrêter le worker puis recréer le web avec sa
@@ -655,7 +648,7 @@ netbox_cots
  [X] 0002_roleassignment
 ```
 
-La 0.3.1 ajoute la migration `0002_roleassignment`. Après mise à jour, les deux migrations doivent être cochées ; la première n’est pas rejouée. Les anciennes installations restent conservées et les nouveaux rôles sont initialement sans COTS : utiliser ensuite la reprise décrite plus haut.
+Depuis la 0.3.0, la migration `0002_roleassignment` est nécessaire. Après mise à jour, les deux migrations doivent être cochées ; la première n’est pas rejouée. Les anciennes installations restent conservées et les nouveaux rôles sont initialement sans COTS : créer ensuite les affectations via l’interface, le CSV ou l’API.
 
 Après réussite, recréer le worker et vérifier son journal :
 
@@ -683,7 +676,7 @@ docker compose exec netbox /opt/netbox/venv/bin/python -c "from importlib.metada
 docker compose exec netbox-worker /opt/netbox/venv/bin/python -c "from importlib.metadata import version; print(version('netbox-cots'))"
 ```
 
-Les deux commandes doivent afficher `0.3.1`. Un worker sans le paquet ou chargé
+Les deux commandes doivent afficher `0.3.2`. Un worker sans le paquet ou chargé
 avec une autre image doit être corrigé et recréé.
 
 Connecté comme superutilisateur, ouvrir **COTS → Applications**, puis
@@ -757,7 +750,7 @@ Fusionner avec votre configuration existante. Import synchrone ; fractionner les
 
 Un rôle porte une seule version par COTS ; aucun override par machine. Tous ses appareils/VM héritent de cette configuration. L’ancienne API Installation est une archive de l’ancien inventaire et ne reflète pas les affectations actuelles des rôles.
 
-Si l’onglet COTS est absent : vérifier le chargement du plugin, la migration 0002 et les permissions RoleAssignment. Si une VM n’hérite de rien : vérifier son rôle natif NetBox et les affectations de ce rôle. Si un CSV par machine est refusé : utiliser la reprise ou un CSV par rôle. Ne pas supprimer la table ni l’historique de migrations pour mettre à jour.
+Si l’onglet COTS est absent : vérifier le chargement du plugin, la migration 0002 et les permissions RoleAssignment. Si une VM n’hérite de rien : vérifier son rôle natif NetBox et les affectations de ce rôle. Si un CSV par machine est refusé : préparer un CSV par rôle. Ne pas supprimer la table ni l’historique de migrations pour mettre à jour.
 
 Les contrôles locaux de cette version sont décrits dans [VALIDATION.md](VALIDATION.md). Ils incluent le schéma, les imports et les requêtes de sélection avec une base relationnelle isolée ; ils ne constituent pas un test de déploiement complet sur votre serveur Docker avec PostgreSQL/Redis.
 
