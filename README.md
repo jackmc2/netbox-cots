@@ -11,6 +11,8 @@ Il ne collecte pas les logiciels sur les machines et ne les déploie pas. Les do
 proviennent des imports CSV, des saisies manuelles ou des écritures API. Ansible
 peut exploiter cet inventaire selon votre propre logique.
 
+Télécharger le [wheel 0.2.1](https://github.com/jackmc2/netbox-cots/releases/download/v0.2.1/netbox_cots-0.2.1-py3-none-any.whl).
+
 ## Compatibilité du wheel unique
 
 Le fichier `netbox_cots-0.2.1-py3-none-any.whl` utilise le même code sur la plage
