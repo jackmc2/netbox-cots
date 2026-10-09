@@ -46,8 +46,8 @@ class RoleAssignmentViewSet(NetBoxModelViewSet):
     @action(detail=False, methods=["get"])
     def machines(self, request):
         params = request.query_params
-        if not (params.get("role") or params.get("role_id")) or not params.get("application") or not params.get("version"):
-            raise ValidationError("Fournir role (slug) ou role_id, application (slug du COTS) et version (exacte).")
+        if not params.get("application", "").strip():
+            raise ValidationError("Fournir application (slug exact du COTS). Les filtres role, role_id et version sont facultatifs.")
         queryset = self.filter_queryset(self.get_queryset())
         targets = machines_for_assignments(queryset, request.user)
         page = self.paginate_queryset(targets)

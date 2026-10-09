@@ -139,7 +139,41 @@ class InventoryTests(TestCase):
         self.assertEqual(len(response.data['results']), 1)
         self.assertIsNotNone(response.data['next'])
 
-    def test_api_requires_three_filters(self):
+    def test_api_application_optional_filters(self):
+        import_csv(self.csv(), dry_run=False)
+        import_csv('role,cots_slug,cots,version\nserveur,notepadpp,Notepad++,8.9\n', dry_run=False)
+        machine = Device(name='PC-002', site_id=self.device.site_id, role_id=self.other_role.pk, device_type_id=self.device.device_type_id)
+        machine.save()
+    
+        def query(**params):
+            req = APIRequestFactory().get('/api/plugins/cots/role-assignments/machines/', params)
+            force_authenticate(req, user=user)
+            response = RoleAssignmentViewSet.as_view({'get': 'machines'}, permission_classes=[AllowAny])(req)
+            self.assertEqual(response.status_code, 200, response.data)
+            return response.data
+        all_rows = query(application='notepadpp')
+        self.assertEqual(all_rows['count'], 3)
+        self.assertEqual({row['name'] for row in all_rows['results']}, {'PC-001', 'VM-001', 'PC-002'})
+        self.assertEqual(query(application='notepadpp', version='8.8')['count'], 2)
+        self.assertEqual(query(application='notepadpp', role='serveur')['count'], 1)
+        self.assertEqual(query(application='notepadpp', role_id=self.other_role.pk)['count'], 1)
+        self.assertEqual(query(application='notepadpp', role='serveur', version='8.8')['count'], 0)
+        self.assertEqual(query(application='unknown')['count'], 0)
+        page = query(application='notepadpp', limit=1)
+        self.assertEqual(page['count'], 3)
+        self.assertIsNotNone(page['next'])
+        from urllib.parse import urlsplit
+        names = {page['results'][0]['name']}
+        while page['next']:
+            req = APIRequestFactory().get(urlsplit(page['next']).path + '?' + urlsplit(page['next']).query)
+            force_authenticate(req, user=user)
+            response = RoleAssignmentViewSet.as_view({'get': 'machines'}, permission_classes=[AllowAny])(req)
+            self.assertEqual(response.status_code, 200, response.data)
+            page = response.data
+            names.update((row['name'] for row in page['results']))
+        self.assertEqual(names, {'PC-001', 'VM-001', 'PC-002'})
+
+    def test_api_requires_application(self):
         req = APIRequestFactory().get('/api/plugins/cots/role-assignments/machines/', {'role': 'poste'})
         force_authenticate(req, user=user)
         response = RoleAssignmentViewSet.as_view({'get': 'machines'}, permission_classes=[AllowAny])(req)

@@ -1,4 +1,4 @@
-# Validation — NetBox COTS 0.3.0
+# Validation — NetBox COTS 0.3.1
 
 ## Vérifications locales
 
@@ -8,7 +8,7 @@ Les contrôles suivants réussissent sur les sources exactes de NetBox **4.4.0, 
 - Compilation des templates, résolution des URL UI/API et des onglets COTS sur DeviceRole, Device et VirtualMachine.
 - Instanciation des tableaux de lecture seule : absence de colonnes actions et sélection PK, même pour un superutilisateur.
 - Rendu isolé de la simulation : rôle, tags prévus et bouton d’intégration.
-- **21 tests relationnels/API isolés sous SQLite**, avec les vrais modèles NetBox/plugin : création partagée appareil/VM, simulation sans tags persistés, mise à jour/idempotence, conservation des tags, rollback global, rôles inconnus et ID/slug incohérents, doublons, unicité rôle/COTS, immutabilité des versions utilisées, héritage après changement de rôle, tableaux/anciennes API en lecture seule, écriture serializer par rôle, sélection exacte rôle/COTS/version, restrictions de lecture, pagination de la sélection API et refus des requêtes incomplètes, reprise gardant les archives, conflits de versions, VM sans rôle, conflit avec une affectation au rôle existante, restrictions de types de tags et restauration des événements après simulation.
+- **22 tests relationnels/API isolés sous SQLite**, avec les vrais modèles NetBox/plugin : création partagée appareil/VM, simulation sans tags persistés, mise à jour/idempotence, conservation des tags, rollback global, rôles inconnus et ID/slug incohérents, doublons, unicité rôle/COTS, immutabilité des versions utilisées, héritage après changement de rôle, tableaux/anciennes API en lecture seule, écriture serializer par rôle, sélection exacte rôle/COTS/version, restrictions de lecture, pagination de la sélection API et refus des requêtes sans COTS, sélection par COTS seul sur plusieurs rôles/versions et filtres facultatifs, reprise gardant les archives, conflits de versions, VM sans rôle, conflit avec une affectation au rôle existante, restrictions de types de tags et restauration des événements après simulation.
 
 En complément :
 
@@ -29,4 +29,4 @@ La suite `netbox_cots.tests` fournit des fixtures NetBox complètes destinées �
 
 ## Recette Docker NetBox 4.4 recommandée
 
-Sauvegarde ; construction avec le wheel 0.3.0 et l’utilisateur de l’image de base ; arrêt des workers, migration 0002, contrôles web puis worker. Vérifier une affectation au rôle, son affichage sur un appareil et une VM, l’absence d’édition individuelle, le changement de rôle, la sélection API avec jeton v1 et pagination, l’import CSV/tag en simulation puis intégration, et la reprise des archives avec un conflit volontaire. Vérifier aussi un compte lecteur restreint. Aucun serveur utilisateur n’a été modifié pendant la fabrication du plugin.
+Sauvegarde ; construction avec le wheel 0.3.1 et l’utilisateur de l’image de base ; arrêt des workers, migration 0002 si mise à jour depuis 0.2.x, contrôles web puis worker. Vérifier une affectation au rôle, son affichage sur un appareil et une VM, l’absence d’édition individuelle, le changement de rôle, la sélection API avec jeton v1 et pagination, l’import CSV/tag en simulation puis intégration, et la reprise des archives avec un conflit volontaire. Vérifier aussi un compte lecteur restreint. Aucun serveur utilisateur n’a été modifié pendant la fabrication du plugin.

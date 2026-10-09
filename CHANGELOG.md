@@ -1,5 +1,13 @@
 # Historique des versions
 
+## 0.3.1
+
+- Sélection API des machines avec le seul slug du COTS : tous rôles et toutes versions.
+- Les filtres rôle/ID et version restent disponibles mais deviennent facultatifs. Le COTS reste obligatoire.
+- README : exemples Notepad++, filtres, permissions et script de pagination avec filtres facultatifs.
+- Aucune migration supplémentaire ; compatibilité NetBox 4.4.0 à 4.7.2 conservée.
+
+
 ## 0.3.0
 
 - Affectation COTS/version aux rôles d’appareil NetBox ; héritage en lecture seule pour leurs appareils et VM.
