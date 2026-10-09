@@ -1,10 +1,10 @@
 from django import forms
-from dcim.models import Device
+from dcim.models import DeviceRole, Device
 from virtualization.models import VirtualMachine
 from netbox.forms import NetBoxModelForm, NetBoxModelFilterSetForm
 from utilities.forms.fields import DynamicModelChoiceField, SlugField
 
-from .models import Application, SoftwareVersion, Installation
+from .models import Application, SoftwareVersion, Installation, RoleAssignment
 
 
 class ApplicationForm(NetBoxModelForm):
@@ -61,3 +61,19 @@ class CSVImportForm(forms.Form):
         if bool(data.get("file")) == bool(data.get("csv_text")):
             raise forms.ValidationError("Fournir soit un fichier, soit du texte CSV.")
         return data
+
+
+class RoleAssignmentForm(NetBoxModelForm):
+    role = DynamicModelChoiceField(queryset=DeviceRole.objects.all(), label="Rôle d’appareil")
+    software_version = DynamicModelChoiceField(queryset=SoftwareVersion.objects.all(), label="COTS / version")
+
+    class Meta:
+        model = RoleAssignment
+        fields = ("role", "software_version", "notes", "tags")
+
+
+class RoleAssignmentFilterForm(NetBoxModelFilterSetForm):
+    model = RoleAssignment
+    role_id = DynamicModelChoiceField(queryset=DeviceRole.objects.all(), required=False, label="Rôle")
+    application_id = DynamicModelChoiceField(queryset=Application.objects.all(), required=False, label="COTS")
+    version = forms.CharField(required=False, label="Version (exacte)")

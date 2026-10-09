@@ -11,68 +11,43 @@ spec.loader.exec_module(parser)
 
 
 class CSVParserTests(unittest.TestCase):
-    header = "machine_type,machine,cots,version\n"
+    header = "role,cots,version\n"
 
     def test_minimal(self):
-        row = parser.parse_csv(self.header + "device,PC-001,Notepad++,8.8\n")[0]
-        self.assertEqual((row.machine_type, row.machine, row.version), ("device", "PC-001", "8.8"))
+        row = parser.parse_csv(self.header + "poste,Notepad++,8.8\n")[0]
+        self.assertEqual((row.role, row.cots, row.version), ("poste", "Notepad++", "8.8"))
 
-    def test_utf8_bom_semicolon_and_whitespace(self):
-        row = parser.parse_csv("\ufeffmachine_type;machine;cots;version\nvirtual_machine; VM-1 ; Café ; 1.0 \n")[0]
-        self.assertEqual((row.machine, row.cots), ("VM-1", "Café"))
+    def test_utf8_and_semicolon(self):
+        row = parser.parse_csv("\ufeffrole;cots;version\n poste ; Café ; 1.0 \n")[0]
+        self.assertEqual((row.role, row.cots), ("poste", "Café"))
 
     def test_quoted_commas(self):
-        row = parser.parse_csv(self.header + 'device,PC-1,"Produit, entreprise",1\n')[0]
+        row = parser.parse_csv(self.header + 'poste,"Produit, entreprise",1\n')[0]
         self.assertEqual(row.cots, "Produit, entreprise")
 
-    def test_id_without_name(self):
-        row = parser.parse_csv("machine_type,machine_id,cots,version\ndevice,123,Java,17\n")[0]
-        self.assertEqual(row.machine_id, 123)
+    def test_role_id(self):
+        row = parser.parse_csv("role_id,cots,version\n123,Java,17\n")[0]
+        self.assertEqual(row.role_id, 123)
 
     def test_versions_are_strings(self):
-        row = parser.parse_csv(self.header + "device,PC-1,App,01.02\n")[0]
-        self.assertEqual(row.version, "01.02")
+        self.assertEqual(parser.parse_csv(self.header + "poste,App,01.02\n")[0].version, "01.02")
 
     def test_reject_invalid_inputs(self):
-        invalid = [
-            "", self.header, "machine_type,machine,cots\ndevice,PC-1,Java\n",
-            "machine_type,machine,cots,version,extra\ndevice,PC-1,Java,17,x\n",
-            "machine_type,machine,machine,cots,version\ndevice,PC-1,PC-1,Java,17\n",
-            self.header + "server,PC-1,Java,17\n",
-            self.header + "device,,Java,17\n",
-            self.header + "device,PC-1,,17\n",
-            self.header + "device,PC-1,Java,\n",
-            self.header + "device,PC-1,Java\n",
-            self.header + "device,PC-1,Java,17,extra\n",
-            self.header + 'device,PC-1,"Java,17\n',
-            self.header + "device,PC-1,Ja\x00va,17\n",
-            "machine_type,machine_id,cots,version\ndevice,-1,Java,17\n",
-            "machine_type,machine_id,cots,version\ndevice,0,Java,17\n",
-            "machine_type,machine_id,cots,version\ndevice,abc,Java,17\n",
-            "machine_type,cots,version\ndevice,Java,17\n",
-            self.header + "device,PC-1,Java," + "x" * 101 + "\n",
-            "machine_type,machine,cots,version,cots_slug\ndevice,PC-1,Java,17,not valid\n",
-        ]
+        invalid = ["", self.header, "role,cots\nposte,Java\n", "role,cots,version,extra\nposte,Java,17,x\n", "role,role,cots,version\nposte,poste,Java,17\n", self.header + ",Java,17\n", self.header + "poste,,17\n", self.header + "poste,Java,\n", self.header + "poste,Java\n", self.header + "poste,Java,17,extra\n", self.header + 'poste,"Java,17\n', self.header + "poste,Ja\x00va,17\n", "role_id,cots,version\n-1,Java,17\n", "role_id,cots,version\n0,Java,17\n", "role_id,cots,version\nabc,Java,17\n", "cots,version\nJava,17\n", self.header + "poste,Java," + "x" * 101 + "\n", "role,cots,version,cots_slug\nposte,Java,17,not valid\n", "machine_type,machine,cots,version\ndevice,PC-1,Java,17\n"]
         for value in invalid:
-            with self.subTest(value=value):
-                with self.assertRaises(parser.ImportFailure):
-                    parser.parse_csv(value)
+            with self.subTest(value=value), self.assertRaises(parser.ImportFailure):
+                parser.parse_csv(value)
 
     def test_limit(self):
         with self.assertRaises(parser.ImportFailure):
-            parser.parse_csv(self.header + "device,PC-1,Java,17\ndevice,PC-2,Java,17\n", max_rows=1)
+            parser.parse_csv(self.header + "poste,Java,17\nserveur,Java,17\n", max_rows=1)
 
     def test_tags(self):
-        row = parser.parse_csv("machine_type,machine,cots,version,tags\ndevice,PC-1,Java,17,Production | Windows | Production\n")[0]
+        row = parser.parse_csv("role,cots,version,tags\nposte,Java,17,Production | Windows | Production\n")[0]
         self.assertEqual(row.tags, ("Production", "Windows"))
-        self.assertEqual(parser.parse_csv(self.header + "device,PC-1,Java,17\n")[0].tags, ())
+        self.assertEqual(parser.parse_csv(self.header + "poste,Java,17\n")[0].tags, ())
 
     def test_invalid_tags(self):
-        header = "machine_type,machine,cots,version,tags\n"
         for tags in ("A||B", "|A", "A|", "x" * 101, "|".join(str(i) for i in range(51))):
             with self.subTest(tags=tags), self.assertRaises(parser.ImportFailure):
-                parser.parse_csv(header + "device,PC-1,Java,17," + tags + "\n")
-
-
-if __name__ == "__main__":
-    unittest.main()
+                parser.parse_csv("role,cots,version,tags\nposte,Java,17," + tags + "\n")

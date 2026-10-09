@@ -1,0 +1,4 @@
+role,cots_slug,cots,version,tags
+poste-windows,notepadpp,Notepad++,8.8,Production|Windows
+poste-windows,7zip,7-Zip,24.09,Windows
+serveur-app,java,Java,17.0.12,Production

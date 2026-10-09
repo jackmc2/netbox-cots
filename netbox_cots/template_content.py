@@ -1,5 +1,5 @@
 from netbox.plugins import PluginTemplateExtension
-from .models import Installation
+from .models import RoleAssignment
 
 
 class MachineCOTS(PluginTemplateExtension):
@@ -7,12 +7,11 @@ class MachineCOTS(PluginTemplateExtension):
 
     def full_width_page(self):
         request = self.context["request"]
-        if not request.user.has_perm("netbox_cots.view_installation"):
+        if not request.user.has_perm("netbox_cots.view_roleassignment"):
             return ""
         machine = self.context["object"]
-        target = "device" if machine._meta.label_lower == "dcim.device" else "virtual_machine"
-        queryset = Installation.objects.restrict(request.user, "view").filter(**{target: machine}).select_related("application", "software_version")
-        return self.render("netbox_cots/machine_panel.html", {"installations": queryset[:100], "installation_count": queryset.count(), "target_filter": target + "_id"})
+        queryset = RoleAssignment.objects.restrict(request.user, "view").filter(role_id=machine.role_id).select_related("role", "application", "software_version")
+        return self.render("netbox_cots/machine_panel.html", {"assignments": queryset[:100], "assignment_count": queryset.count(), "role": machine.role})
 
 
 template_extensions = [MachineCOTS]

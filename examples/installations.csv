@@ -1,5 +1,0 @@
-machine_type,machine,cots_slug,cots,version,publisher
-device,PC-001,notepadpp,Notepad++,8.8,
-device,PC-001,7zip,7-Zip,24.09,
-device,PC-002,notepadpp,Notepad++,8.8,
-virtual_machine,SRV-APP01,java,Java,17.0.12,

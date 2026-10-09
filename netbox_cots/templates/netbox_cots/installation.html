@@ -1,5 +1,6 @@
 {% extends 'generic/object.html' %}
-{% block content %}
+{% block controls %}{% endblock %}
+{% block content %}<div class="alert alert-warning">Ancienne affectation par machine, conservée en archive. Elle n’est plus modifiable et ne détermine pas les COTS hérités du rôle.</div>
 <div class="card"><h2 class="card-header">Installation recensée</h2><table class="table attr-table">
   <tr><th>Machine</th><td><a href="{{ object.machine.get_absolute_url }}">{{ object.machine }}</a></td></tr>
   <tr><th>COTS / version</th><td><a href="{{ object.software_version.get_absolute_url }}">{{ object.software_version }}</a></td></tr>

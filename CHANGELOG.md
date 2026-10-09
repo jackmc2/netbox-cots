@@ -1,5 +1,15 @@
 # Historique des versions
 
+## 0.3.0
+
+- Affectation COTS/version aux rôles d’appareil NetBox ; héritage en lecture seule pour leurs appareils et VM.
+- Onglet COTS sur DeviceRole, liste/édition des affectations, tags et import CSV par rôle avec simulation puis intégration.
+- API de sélection des appareils et VM par rôle/COTS/version, avec pagination et restrictions d’objets.
+- Migration 0002 ajoutant RoleAssignment ; anciennes installations conservées en archive, API d’écriture et édition individuelles désactivées.
+- Reprise assistée des anciennes installations via CSV prérempli, sans choix automatique lors des conflits de versions.
+- Purge réservée aux nouvelles affectations ; archives conservées.
+- Documentation des changements de modèle, des API et de la reprise ; utilisateur Docker à reprendre de l’image de base.
+
 ## 0.2.3
 
 - Colonne CSV optionnelle `tags` avec noms séparés par `|`, affectée aux installations.

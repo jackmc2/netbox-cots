@@ -1,183 +1,193 @@
+from types import SimpleNamespace
 from django.core.exceptions import ValidationError
 from django.test import TestCase
-from django.urls import reverse
+from django.db import transaction
+from django.urls import reverse, NoReverseMatch
+from django.contrib.contenttypes.models import ContentType
 from dcim.models import Device, DeviceRole, DeviceType, Manufacturer, Site
 from virtualization.models import VirtualMachine
+from extras.models import Tag
 from netbox.context import events_queue
-from extras.models import Tag, TaggedItem
-from django.contrib.contenttypes.models import ContentType
-
 from netbox_cots.csv_parser import ImportFailure
 from netbox_cots.importer import import_csv
-from netbox_cots.models import Application, SoftwareVersion, Installation
-from netbox_cots.filtersets import InstallationFilterSet
-from netbox_cots.api.serializers import InstallationSerializer
-
+from netbox_cots.models import Application, SoftwareVersion, Installation, RoleAssignment
+from netbox_cots.api.views import machines_for_assignments, RoleAssignmentViewSet, InstallationViewSet
+from netbox_cots.api.serializers import RoleAssignmentSerializer
+from netbox_cots.views import DeviceCOTSView
+from netbox_cots.legacy import legacy_role_csv
+from netbox_cots.tables import InheritedCOTSTable
+from rest_framework.test import APIRequestFactory, force_authenticate
+from rest_framework.permissions import AllowAny
+user = SimpleNamespace(is_superuser=True, is_authenticated=True, is_active=True, has_perm=lambda *args: True, has_perms=lambda *args: True)
 
 class InventoryTests(TestCase):
+
     @classmethod
     def setUpTestData(cls):
-        manufacturer = Manufacturer.objects.create(name="COTS test", slug="cots-test")
-        device_type = DeviceType.objects.create(manufacturer=manufacturer, model="Test PC", slug="test-pc")
-        role = DeviceRole.objects.create(name="COTS test", slug="cots-test")
-        site = Site.objects.create(name="COTS test", slug="cots-test")
-        cls.device = Device.objects.create(name="PC-001", device_type=device_type, role=role, site=site)
-        cls.vm = VirtualMachine.objects.create(name="VM-001")
+        manufacturer = Manufacturer.objects.create(name='COTS test', slug='cots-test')
+        device_type = DeviceType.objects.create(manufacturer=manufacturer, model='Test PC', slug='test-pc')
+        cls.role = DeviceRole.objects.create(name='Poste', slug='poste', vm_role=True)
+        cls.other_role = DeviceRole.objects.create(name='Serveur', slug='serveur', vm_role=True)
+        site = Site.objects.create(name='COTS test', slug='cots-test')
+        cls.device = Device.objects.create(name='PC-001', device_type=device_type, role=cls.role, site=site)
+        cls.vm = VirtualMachine.objects.create(name='VM-001', role=cls.role)
 
-    def csv(self, version="8.8"):
-        return f"machine_type,machine,cots_slug,cots,version\ndevice,PC-001,notepadpp,Notepad++,{version}\nvirtual_machine,VM-001,notepadpp,Notepad++,{version}\n"
+    def csv(self, version='8.8', tags='Production'):
+        return 'role,cots_slug,cots,version,tags\nposte,notepadpp,Notepad++,' + version + ',' + tags + '\n'
 
-    def test_create_both_target_types(self):
-        result = import_csv(self.csv(), dry_run=False)
-        self.assertEqual(result["counts"]["applications_created"], 1)
-        self.assertEqual(SoftwareVersion.objects.count(), 1)
+    def test_create_shared_and_preview_tags(self):
+        r = import_csv(self.csv())
+        self.assertEqual(r['counts']['assignments_created'], 1)
+        self.assertEqual(r['created_tags'][0]['name'], 'Production')
+        self.assertEqual(RoleAssignment.objects.count(), 0)
+        self.assertEqual(Tag.objects.count(), 0)
+        import_csv(self.csv(), dry_run=False)
+        self.assertEqual(RoleAssignment.objects.get().tags.get().name, 'Production')
+        self.assertEqual(Installation.objects.count(), 0)
+        rows = list(machines_for_assignments(RoleAssignment.objects.all(), user))
+        self.assertEqual({(x['type'], x['name']) for x in rows}, {('device', 'PC-001'), ('virtual_machine', 'VM-001')})
+
+    def test_idempotent_and_update(self):
+        import_csv(self.csv(), dry_run=False)
+        pk = RoleAssignment.objects.get().pk
+        r = import_csv(self.csv(), dry_run=False)
+        self.assertEqual(r['counts']['unchanged'], 1)
+        import_csv(self.csv('8.9', 'Windows'), dry_run=False)
+        a = RoleAssignment.objects.get()
+        self.assertEqual(a.pk, pk)
+        self.assertEqual(a.software_version.version, '8.9')
+        self.assertEqual(a.tags.count(), 2)
+
+    def test_tags_preserved_without_column(self):
+        import_csv(self.csv(), dry_run=False)
+        import_csv('role,cots,version,cots_slug\nposte,Notepad++,8.8,notepadpp\n', dry_run=False)
+        self.assertEqual(RoleAssignment.objects.get().tags.count(), 1)
+
+    def test_conflicts_rollback(self):
+        with self.assertRaises(ImportFailure):
+            import_csv(self.csv() + 'poste,notepadpp,Notepad++,8.9,Other\n', dry_run=False)
+        self.assertEqual(RoleAssignment.objects.count(), 0)
+        self.assertEqual(Tag.objects.count(), 0)
+
+    def test_unknown_and_id_mismatch(self):
+        with self.assertRaises(ImportFailure):
+            import_csv('role,cots,version\nmissing,Java,17\n', dry_run=False)
+        with self.assertRaises(ImportFailure):
+            import_csv('role_id,role,cots,version\n1,serveur,Java,17\n', dry_run=False)
+
+    def test_duplicate_row(self):
+        r = import_csv(self.csv() + 'poste,notepadpp,Notepad++,8.8,Production\n', dry_run=False)
+        self.assertEqual(r['counts']['duplicates'], 1)
+
+    def test_unique_role_app(self):
+        import_csv(self.csv(), dry_run=False)
+        a = RoleAssignment.objects.get()
+        with self.assertRaises(ValidationError):
+            RoleAssignment(role=self.role, software_version=a.software_version).save()
+
+    def test_used_version_immutable(self):
+        import_csv(self.csv(), dry_run=False)
+        sv = SoftwareVersion.objects.get()
+        sv.version = 'X'
+        with self.assertRaises(ValidationError):
+            sv.full_clean()
+
+    def test_role_change_inheritance(self):
+        import_csv(self.csv(), dry_run=False)
+        self.device.role_id = self.other_role.pk
+        self.device.save_base(raw=True)
+        self.assertEqual(list(DeviceCOTSView().get_children(SimpleNamespace(user=user), self.device)), [])
+        self.device.role_id = self.role.pk
+        self.device.save_base(raw=True)
+        self.assertEqual(DeviceCOTSView().get_children(SimpleNamespace(user=user), self.device).count(), 1)
+
+    def test_readonly_tables_and_legacy_endpoints(self):
+        self.assertNotIn('actions', InheritedCOTSTable.Meta.fields)
+        self.assertFalse(hasattr(InstallationViewSet, 'create'))
+        with self.assertRaises(NoReverseMatch):
+            reverse('plugins:netbox_cots:installation_edit', args=[1])
+        self.assertTrue(reverse('dcim:devicerole_cots', args=[1]))
+
+    def test_serializer_write(self):
+        app = Application.objects.create(name='Java', slug='java')
+        sv = SoftwareVersion.objects.create(application=app, version='17')
+        s = RoleAssignmentSerializer(data={'role': self.role.pk, 'software_version': sv.pk}, context={'request': None})
+        self.assertTrue(s.is_valid(), s.errors)
+        a = s.save()
+        self.assertEqual(a.application_id, app.pk)
+
+    def test_query_role_cots_version(self):
+        import_csv(self.csv(), dry_run=False)
+        from netbox_cots.filtersets import RoleAssignmentFilterSet
+        qs = RoleAssignmentFilterSet({'role': 'poste', 'application': 'notepadpp', 'version': '8.8'}, queryset=RoleAssignment.objects.all()).qs
+        self.assertEqual(len(list(machines_for_assignments(qs, user))), 2)
+        qs = RoleAssignmentFilterSet({'role': 'serveur', 'application': 'notepadpp', 'version': '8.8'}, queryset=RoleAssignment.objects.all()).qs
+        self.assertEqual(list(machines_for_assignments(qs, user)), [])
+
+    def test_machine_permissions(self):
+        import_csv(self.csv(), dry_run=False)
+        reader = SimpleNamespace(is_superuser=False, is_authenticated=True, is_active=True, get_all_permissions=lambda: set())
+        self.assertEqual(list(machines_for_assignments(RoleAssignment.objects.all(), reader)), [])
+
+    def test_paginated_api(self):
+        import_csv(self.csv(), dry_run=False)
+        req = APIRequestFactory().get('/api/plugins/cots/role-assignments/machines/', {'role': 'poste', 'application': 'notepadpp', 'version': '8.8', 'limit': 1})
+        force_authenticate(req, user=user)
+        response = RoleAssignmentViewSet.as_view({'get': 'machines'}, permission_classes=[AllowAny])(req)
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data['count'], 2)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertIsNotNone(response.data['next'])
+
+    def test_api_requires_three_filters(self):
+        req = APIRequestFactory().get('/api/plugins/cots/role-assignments/machines/', {'role': 'poste'})
+        force_authenticate(req, user=user)
+        response = RoleAssignmentViewSet.as_view({'get': 'machines'}, permission_classes=[AllowAny])(req)
+        self.assertEqual(response.status_code, 400)
+
+    def legacy(self, version='8.8', target=None):
+        target = target or self.device
+        app, _ = Application.objects.get_or_create(name='Notepad++', slug='notepadpp')
+        sv, _ = SoftwareVersion.objects.get_or_create(application=app, version=version)
+        return Installation.objects.create(software_version=sv, **{'device': target} if isinstance(target, Device) else {'virtual_machine': target})
+
+    def test_legacy_conversion_keeps_archive(self):
+        self.legacy()
+        self.legacy(target=self.vm)
+        text = legacy_role_csv()
+        r = import_csv(text)
+        self.assertEqual(r['counts']['assignments_created'], 1)
+        self.assertEqual(Installation.objects.count(), 2)
+        import_csv(text, dry_run=False)
         self.assertEqual(Installation.objects.count(), 2)
 
-    def test_idempotent_reimport(self):
-        import_csv(self.csv(), dry_run=False)
-        result = import_csv(self.csv(), dry_run=False)
-        self.assertEqual(result["counts"]["unchanged"], 2)
-        self.assertEqual(Installation.objects.count(), 2)
-
-    def test_update_and_keep_unmentioned_installations(self):
-        import_csv(self.csv("8.7.9"), dry_run=False)
-        before = Installation.objects.get(device=self.device)
-        import_csv("machine_type,machine,cots_slug,cots,version\ndevice,PC-001,notepadpp,Notepad++,8.8\n", dry_run=False)
-        before.refresh_from_db()
-        self.assertEqual(before.software_version.version, "8.8")
-        self.assertEqual(Installation.objects.get(virtual_machine=self.vm).software_version.version, "8.7.9")
-
-    def test_dry_run_has_no_records_or_events(self):
-        previous = events_queue.get().copy()
-        result = import_csv(self.csv())
-        self.assertEqual(result["counts"]["installations_created"], 2)
-        self.assertEqual(Application.objects.count(), 0)
-        self.assertEqual(events_queue.get(), previous)
-
-    def test_missing_machine_rolls_back_everything(self):
+    def test_legacy_conflicting_versions(self):
+        self.legacy()
+        self.legacy('8.9', self.vm)
         with self.assertRaises(ImportFailure):
-            import_csv(self.csv() + "device,MISSING,java,Java,17\n", dry_run=False)
-        self.assertEqual(Application.objects.count(), 0)
+            legacy_role_csv()
+        self.assertEqual(RoleAssignment.objects.count(), 0)
 
-    def test_conflicting_rows_roll_back_created_records(self):
+    def test_legacy_no_role(self):
+        self.vm.role_id = None
+        self.vm.save_base(raw=True)
+        self.legacy(target=self.vm)
         with self.assertRaises(ImportFailure):
-            import_csv(self.csv() + "device,PC-001,notepadpp,Notepad++,8.9\n", dry_run=False)
-        self.assertEqual(Application.objects.count(), 0)
+            legacy_role_csv()
 
-    def test_slug_collision_is_not_silently_merged(self):
-        csv = "machine_type,machine,cots,version\ndevice,PC-001,C++,1\ndevice,PC-001,C#,1\n"
+    def test_legacy_existing_role_version_conflict(self):
+        self.legacy()
+        import_csv(self.csv('8.9'), dry_run=False)
         with self.assertRaises(ImportFailure):
-            import_csv(csv, dry_run=False)
-        self.assertEqual(Application.objects.count(), 0)
+            legacy_role_csv()
 
-    def test_repeated_same_row_is_ignored(self):
-        csv = "machine_type,machine,cots,version\ndevice,PC-001,Java,17\ndevice,PC-001,Java,17\n"
-        result = import_csv(csv, dry_run=False)
-        self.assertEqual(result["counts"]["duplicates"], 1)
-        self.assertEqual(Installation.objects.count(), 1)
-
-    def test_machine_id_and_name_must_agree(self):
-        csv = f"machine_type,machine_id,machine,cots,version\ndevice,{self.device.pk},OTHER,Java,17\n"
+    def test_tag_type_restriction(self):
+        t = Tag.objects.create(name='Production', slug='production')
+        t.object_types.add(ContentType.objects.get_for_model(Installation))
         with self.assertRaises(ImportFailure):
-            import_csv(csv, dry_run=False)
+            import_csv(self.csv(), dry_run=False)
 
-    def test_unique_application_per_machine(self):
-        import_csv(self.csv(), dry_run=False)
-        app = Application.objects.get(slug="notepadpp")
-        other = SoftwareVersion.objects.create(application=app, version="8.9")
-        with self.assertRaises(ValidationError):
-            Installation(device=self.device, software_version=other).full_clean()
-
-    def test_exactly_one_target(self):
-        app = Application.objects.create(name="Java", slug="java")
-        version = SoftwareVersion.objects.create(application=app, version="17")
-        for target in ({}, {"device": self.device, "virtual_machine": self.vm}):
-            with self.subTest(target=target), self.assertRaises(ValidationError):
-                Installation(software_version=version, **target).full_clean()
-
-    def test_used_version_is_immutable(self):
-        import_csv(self.csv(), dry_run=False)
-        version = SoftwareVersion.objects.get(version="8.8")
-        version.version = "8.9"
-        with self.assertRaises(ValidationError):
-            version.full_clean()
-
-    def test_filter_application_and_version(self):
-        import_csv(self.csv(), dry_run=False)
-        filtered = InstallationFilterSet({"application": "notepadpp", "version": "8.8"}, queryset=Installation.objects.all())
-        self.assertTrue(filtered.is_valid())
-        self.assertEqual(filtered.qs.count(), 2)
-        self.assertEqual(InstallationFilterSet({"version": "8.8.0"}, queryset=Installation.objects.all()).qs.count(), 0)
-
-    def test_ui_and_api_urls(self):
-        import_csv(self.csv(), dry_run=False)
-        version = SoftwareVersion.objects.get(version="8.8")
-        self.assertEqual(reverse("plugins-api:netbox_cots-api:softwareversion-detail", args=[version.pk]), f"/api/plugins/cots/versions/{version.pk}/")
-
-    def test_api_create_and_update(self):
-        application = Application.objects.create(name="Java", slug="java")
-        first = SoftwareVersion.objects.create(application=application, version="17")
-        second = SoftwareVersion.objects.create(application=application, version="21")
-        serializer = InstallationSerializer(data={"software_version": first.pk, "device": self.device.pk}, context={"request": None})
-        self.assertTrue(serializer.is_valid(), serializer.errors)
-        instance = serializer.save()
-        self.assertEqual(instance.application_id, application.pk)
-        update = InstallationSerializer(instance, data={"software_version": second.pk}, partial=True, context={"request": None})
-        self.assertTrue(update.is_valid(), update.errors)
-        instance = update.save()
-        data = InstallationSerializer(instance, context={"request": None}).data
-        self.assertEqual(data["machine"]["name"], "PC-001")
-        self.assertEqual(data["software_version"]["version"], "21")
-
-    def test_import_requires_superuser(self):
-        from types import SimpleNamespace
-        from django.core.exceptions import PermissionDenied
-        from django.test import RequestFactory
-        from netbox_cots.views import CSVImportView
-        request = RequestFactory().post("/plugins/cots/import/")
-        request.user = SimpleNamespace(is_authenticated=True, is_superuser=False)
-        with self.assertRaises(PermissionDenied):
-            CSVImportView.as_view()(request)
-
-    def tag_csv(self,tags='Production|Windows',version='8.8'):
-     return 'machine_type,machine,cots_slug,cots,version,tags\ndevice,PC-001,notepadpp,Notepad++,'+version+','+tags+'\n'
-    def test_tag_preview_and_apply(self):
-     r=import_csv(self.tag_csv())
-     self.assertEqual(r['counts']['tags_created'],2)
-     self.assertEqual({t['name'] for t in r['created_tags']},{'Production','Windows'})
-     self.assertEqual(Tag.objects.count(),0)
-     self.assertEqual(TaggedItem.objects.count(),0)
-     import_csv(self.tag_csv(),dry_run=False)
-     self.assertEqual(set(Installation.objects.get(device=self.device).tags.values_list('name',flat=True)),{'Production','Windows'})
-     r=import_csv(self.tag_csv(),dry_run=False)
-     self.assertEqual(r['counts']['tags_created'],0)
-     self.assertEqual(r['counts']['tags_added'],0)
-     self.assertEqual(r['counts']['unchanged'],1)
-    def test_preserve_add_blank_and_omit(self):
-     import_csv(self.tag_csv('Production'),dry_run=False)
-     r=import_csv(self.tag_csv('Windows'),dry_run=False)
-     self.assertEqual(r['counts']['installations_updated'],1)
-     self.assertEqual(r['counts']['tags_added'],1)
-     self.assertEqual(r['details'][0]['tags_after'],['Production','Windows'])
-     import_csv(self.tag_csv(''),dry_run=False)
-     import_csv('machine_type,machine,cots_slug,cots,version\ndevice,PC-001,notepadpp,Notepad++,8.8\n',dry_run=False)
-     self.assertEqual(Installation.objects.get(device=self.device).tags.count(),2)
-    def test_tag_reuse(self):
-     Tag.objects.create(name='Production',slug='custom-production')
-     r=import_csv(self.tag_csv('Production'),dry_run=False)
-     self.assertEqual(r['counts']['tags_created'],0)
-     self.assertEqual(Installation.objects.get(device=self.device).tags.get().slug,'custom-production')
-    def test_tags_rollback_and_collision(self):
-     with self.assertRaises(ImportFailure):
-      import_csv(self.tag_csv('Production')+'device,PC-001,notepadpp,Notepad++,8.8,Other\n',dry_run=False)
-     self.assertEqual(Tag.objects.count(),0)
-     self.assertEqual(Installation.objects.count(),0)
-     Tag.objects.create(name='Existing',slug='production')
-     with self.assertRaises(ImportFailure):import_csv(self.tag_csv('Production'),dry_run=False)
-     self.assertEqual(Tag.objects.count(),1)
-    def test_restricted_tag(self):
-     t=Tag.objects.create(name='Production',slug='production')
-     ct=ContentType.objects.get_for_model(Device)
-     t.object_types.add(ct)
-     with self.assertRaises(ImportFailure):import_csv(self.tag_csv('Production'),dry_run=False)
-     self.assertEqual(Installation.objects.count(),0)
+    def test_events_restore(self):
+        before = events_queue.get().copy()
+        import_csv(self.csv())
+        self.assertEqual(before, events_queue.get())

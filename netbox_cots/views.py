@@ -10,14 +10,14 @@ from django.shortcuts import redirect, render
 from django.views import View
 from netbox.views import generic
 from netbox.object_actions import AddObject, BulkExport
-from dcim.models import Device
+from dcim.models import DeviceRole, Device
 from virtualization.models import VirtualMachine
 from utilities.views import register_model_view, ViewTab
 
 from . import forms, tables, filtersets
 from .csv_parser import ImportFailure
 from .importer import import_csv
-from .models import Application, SoftwareVersion, Installation
+from .models import Application, SoftwareVersion, Installation, RoleAssignment
 
 
 class ApplicationListView(generic.ObjectListView):
@@ -58,8 +58,9 @@ class SoftwareVersionView(generic.ObjectView):
     template_name = "netbox_cots/softwareversion.html"
 
     def get_extra_context(self, request, instance):
-        queryset = instance.installations.restrict(request.user, "view").select_related("device", "virtual_machine", "software_version", "application")
-        return {"installation_count": queryset.count(), "installations": queryset[:100]}
+        assignments = instance.role_assignments.restrict(request.user, "view").select_related("role", "software_version", "application")
+        return {"role_assignments": assignments[:100]}
+
 
 
 class SoftwareVersionEditView(generic.ObjectEditView):
@@ -73,36 +74,48 @@ class SoftwareVersionDeleteView(generic.ObjectDeleteView):
 
 class InstallationListView(generic.ObjectListView):
     queryset = Installation.objects.select_related("application", "software_version", "device", "virtual_machine").prefetch_related("tags")
-    table = tables.InstallationTable
+    table = tables.LegacyInstallationTable
     filterset = filtersets.InstallationFilterSet
     filterset_form = forms.InstallationFilterForm
-    actions = (AddObject, BulkExport)
+    actions = (BulkExport,)
 
 
 class InstallationView(generic.ObjectView):
+    actions = ()
     queryset = Installation.objects.select_related("application", "software_version", "device", "virtual_machine")
     template_name = "netbox_cots/installation.html"
 
 
-class InstallationEditView(generic.ObjectEditView):
-    queryset = Installation.objects.all()
-    form = forms.InstallationForm
+class RoleAssignmentListView(generic.ObjectListView):
+    queryset = RoleAssignment.objects.select_related("role", "application", "software_version").prefetch_related("tags")
+    table = tables.RoleAssignmentTable
+    filterset = filtersets.RoleAssignmentFilterSet
+    filterset_form = forms.RoleAssignmentFilterForm
+    actions = (AddObject, BulkExport)
 
 
-class InstallationDeleteView(generic.ObjectDeleteView):
-    queryset = Installation.objects.all()
+class RoleAssignmentView(generic.ObjectView):
+    queryset = RoleAssignment.objects.select_related("role", "software_version", "application")
+    template_name = "netbox_cots/roleassignment.html"
+
+
+class RoleAssignmentEditView(generic.ObjectEditView):
+    queryset = RoleAssignment.objects.all()
+    form = forms.RoleAssignmentForm
+
+
+class RoleAssignmentDeleteView(generic.ObjectDeleteView):
+    queryset = RoleAssignment.objects.all()
 
 
 class MachineCOTSView(generic.ObjectChildrenView):
-    child_model = Installation
-    table = tables.InstallationTable
-    filterset = filtersets.InstallationFilterSet
-    filterset_form = forms.InstallationFilterForm
+    child_model = RoleAssignment
+    table = tables.InheritedCOTSTable
     actions = ()
-    tab = ViewTab(label="COTS", permission="netbox_cots.view_installation", weight=900)
+    tab = ViewTab(label="COTS", permission="netbox_cots.view_roleassignment", weight=900)
 
     def get_children(self, request, parent):
-        return parent.cots_installations.restrict(request.user, "view").select_related("application", "software_version", "device", "virtual_machine")
+        return RoleAssignment.objects.restrict(request.user, "view").filter(role_id=parent.role_id).select_related("role", "application", "software_version").prefetch_related("tags")
 
 
 @register_model_view(Device, "cots", path="cots")
@@ -115,6 +128,19 @@ class DeviceCOTSView(MachineCOTSView):
 class VirtualMachineCOTSView(MachineCOTSView):
     queryset = VirtualMachine.objects.all()
     template_name = "netbox_cots/vm_cots.html"
+
+
+@register_model_view(DeviceRole, "cots", path="cots")
+class RoleCOTSView(generic.ObjectChildrenView):
+    queryset = DeviceRole.objects.all()
+    child_model = RoleAssignment
+    table = tables.RoleAssignmentTable
+    template_name = "netbox_cots/role_cots.html"
+    actions = (BulkExport,)
+    tab = ViewTab(label="COTS", permission="netbox_cots.view_roleassignment", weight=900)
+
+    def get_children(self, request, parent):
+        return parent.cots_assignments.restrict(request.user, "view").select_related("role", "application", "software_version").prefetch_related("tags")
 
 
 class CSVImportView(LoginRequiredMixin, View):
@@ -195,6 +221,19 @@ class CSVImportView(LoginRequiredMixin, View):
         })
 
 
+class CSVConvertLegacyView(CSVImportView):
+    def get(self, request):
+        from .legacy import legacy_role_csv
+        try:
+            text = legacy_role_csv()
+        except ImportFailure as exc:
+            return render(request, "netbox_cots/import.html", {"form": forms.CSVImportForm(), "error": str(exc)})
+        return render(request, "netbox_cots/import.html", {
+            "form": forms.CSVImportForm(initial={"csv_text": text}),
+            "legacy_conversion": True,
+        })
+
+
 class PurgeInstallationsView(LoginRequiredMixin, View):
     """Delete all COTS installations while preserving the COTS/version catalogue."""
 
@@ -203,17 +242,17 @@ class PurgeInstallationsView(LoginRequiredMixin, View):
 
     def dispatch(self, request, *args, **kwargs):
         if request.user.is_authenticated and not request.user.is_superuser:
-            raise PermissionDenied("La purge des installations COTS est réservée aux superutilisateurs.")
+            raise PermissionDenied("La purge des affectations aux rôles est réservée aux superutilisateurs.")
         return super().dispatch(request, *args, **kwargs)
 
     def get(self, request):
         return render(request, self.template_name, {
-            "installation_count": Installation.objects.count(),
+            "installation_count": RoleAssignment.objects.count(),
             "confirmation_text": self.confirmation_text,
         })
 
     def post(self, request):
-        installation_count = Installation.objects.count()
+        installation_count = RoleAssignment.objects.count()
         if request.POST.get("confirmation", "").strip() != self.confirmation_text:
             return render(request, self.template_name, {
                 "installation_count": installation_count,
@@ -221,9 +260,9 @@ class PurgeInstallationsView(LoginRequiredMixin, View):
                 "error": f"Saisir {self.confirmation_text} pour confirmer la suppression.",
             })
         with transaction.atomic():
-            deleted_count, _ = Installation.objects.all().delete()
+            deleted_count, _ = RoleAssignment.objects.all().delete()
         messages.success(
             request,
-            f"Purge terminée : {deleted_count} installation(s) COTS supprimée(s). Le catalogue COTS et les versions sont conservés.",
+            f"Purge terminée : {deleted_count} affectation(s) aux rôles supprimée(s). Le catalogue COTS et les versions sont conservés.",
         )
-        return redirect("plugins:netbox_cots:installation_list")
+        return redirect("plugins:netbox_cots:roleassignment_list")

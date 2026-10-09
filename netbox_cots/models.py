@@ -40,7 +40,7 @@ class SoftwareVersion(NetBoxModel):
         super().clean()
         if self.pk:
             original = type(self).objects.filter(pk=self.pk).values("application_id", "version").first()
-            if original and self.installations.exists() and (
+            if original and (self.installations.exists() or self.role_assignments.exists()) and (
                 original["application_id"] != self.application_id or original["version"] != self.version
             ):
                 raise ValidationError("Une version utilisée est immuable : créer une nouvelle version et réaffecter les installations.")
@@ -96,3 +96,40 @@ class Installation(NetBoxModel):
 
     def get_absolute_url(self):
         return reverse("plugins:netbox_cots:installation", args=[self.pk])
+
+
+class RoleAssignment(NetBoxModel):
+    """One software version per device role, inherited live by its machines."""
+    role = models.ForeignKey("dcim.DeviceRole", on_delete=models.CASCADE, related_name="cots_assignments")
+    application = models.ForeignKey(Application, on_delete=models.PROTECT, related_name="role_assignments", editable=False)
+    software_version = models.ForeignKey(SoftwareVersion, on_delete=models.PROTECT, related_name="role_assignments")
+    notes = models.CharField("Notes", max_length=200, blank=True)
+
+    class Meta:
+        ordering = ("role__name", "application__name", "pk")
+        verbose_name = "Affectation au rôle"
+        verbose_name_plural = "Affectations aux rôles"
+        constraints = [models.UniqueConstraint(fields=("role", "application"), name="cots_unique_role_app")]
+
+    def __str__(self):
+        return f"{self.role} : {self.software_version}"
+
+    def full_clean(self, *args, **kwargs):
+        if self.software_version_id:
+            self.application_id = self.software_version.application_id
+        return super().full_clean(*args, **kwargs)
+
+    def clean(self):
+        super().clean()
+        if self.software_version_id:
+            self.application_id = self.software_version.application_id
+
+    def save(self, *args, **kwargs):
+        self.application_id = self.software_version.application_id
+        self.full_clean()
+        if kwargs.get("update_fields") is not None:
+            kwargs["update_fields"] = set(kwargs["update_fields"]) | {"application"}
+        return super().save(*args, **kwargs)
+
+    def get_absolute_url(self):
+        return reverse("plugins:netbox_cots:roleassignment", args=[self.pk])

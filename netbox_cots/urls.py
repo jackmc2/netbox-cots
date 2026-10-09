@@ -3,6 +3,7 @@ from utilities.urls import get_model_urls
 from . import views
 
 urlpatterns = [
+    path("convert-legacy/", views.CSVConvertLegacyView.as_view(), name="convert_legacy"),
     path("import/", views.CSVImportView.as_view(), name="csv_import"),
     path("installations/purge/", views.PurgeInstallationsView.as_view(), name="purge_installations"),
 ]
@@ -10,7 +11,7 @@ urlpatterns = [
 for route, name, list_view, detail_view, edit_view, delete_view in (
     ("applications", "application", views.ApplicationListView, views.ApplicationView, views.ApplicationEditView, views.ApplicationDeleteView),
     ("versions", "softwareversion", views.SoftwareVersionListView, views.SoftwareVersionView, views.SoftwareVersionEditView, views.SoftwareVersionDeleteView),
-    ("installations", "installation", views.InstallationListView, views.InstallationView, views.InstallationEditView, views.InstallationDeleteView),
+    ("role-assignments", "roleassignment", views.RoleAssignmentListView, views.RoleAssignmentView, views.RoleAssignmentEditView, views.RoleAssignmentDeleteView),
 ):
     urlpatterns += [
         path(f"{route}/", list_view.as_view(), name=f"{name}_list"),
@@ -20,3 +21,10 @@ for route, name, list_view, detail_view, edit_view, delete_view in (
         path(f"{route}/<int:pk>/delete/", delete_view.as_view(), name=f"{name}_delete"),
         path(f"{route}/<int:pk>/", include(get_model_urls("netbox_cots", name))),
     ]
+
+# Previous machine-level records remain readable for export and conversion only.
+urlpatterns += [
+    path("installations/", views.InstallationListView.as_view(), name="installation_list"),
+    path("installations/<int:pk>/", views.InstallationView.as_view(), name="installation"),
+    path("installations/<int:pk>/", include(get_model_urls("netbox_cots", "installation"))),
+]

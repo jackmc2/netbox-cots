@@ -1,8 +1,8 @@
 from rest_framework import serializers
-from dcim.api.serializers import DeviceSerializer
+from dcim.api.serializers import DeviceRoleSerializer, DeviceSerializer
 from virtualization.api.serializers import VirtualMachineSerializer
 from netbox.api.serializers import NetBoxModelSerializer
-from ..models import Application, SoftwareVersion, Installation
+from ..models import Application, SoftwareVersion, Installation, RoleAssignment
 
 
 COMMON = ("id", "url", "display", "created", "last_updated", "tags", "custom_fields")
@@ -39,3 +39,14 @@ class InstallationSerializer(NetBoxModelSerializer):
         model = Installation
         fields = COMMON + ("application", "software_version", "device", "virtual_machine", "machine", "notes")
         brief_fields = ("id", "url", "display", "application", "software_version", "machine")
+
+
+class RoleAssignmentSerializer(NetBoxModelSerializer):
+    role = DeviceRoleSerializer(nested=True)
+    application = ApplicationSerializer(nested=True, read_only=True)
+    software_version = SoftwareVersionSerializer(nested=True)
+
+    class Meta:
+        model = RoleAssignment
+        fields = COMMON + ("role", "application", "software_version", "notes")
+        brief_fields = ("id", "url", "display", "role", "application", "software_version")

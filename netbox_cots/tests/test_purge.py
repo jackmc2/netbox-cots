@@ -20,14 +20,14 @@ class PurgeInstallationsViewTests(SimpleTestCase):
         request.user = SimpleNamespace(is_authenticated=True, is_superuser=superuser)
         return request
 
-    @patch("netbox_cots.views.Installation.objects")
+    @patch("netbox_cots.views.RoleAssignment.objects")
     def test_get_displays_count(self, objects):
         objects.count.return_value = 12
         result = PurgeInstallationsView.as_view()(self.request())
         self.assertEqual(result["installation_count"], 12)
         self.assertEqual(result["confirmation_text"], "SUPPRIMER")
 
-    @patch("netbox_cots.views.Installation.objects")
+    @patch("netbox_cots.views.RoleAssignment.objects")
     def test_wrong_confirmation_does_not_delete(self, objects):
         objects.count.return_value = 12
         result = PurgeInstallationsView.as_view()(self.request("post", {"confirmation": "NON"}))
@@ -35,10 +35,10 @@ class PurgeInstallationsViewTests(SimpleTestCase):
         objects.all.assert_not_called()
 
     @patch("netbox_cots.views.transaction.atomic")
-    @patch("netbox_cots.views.Installation.objects")
+    @patch("netbox_cots.views.RoleAssignment.objects")
     def test_confirmed_purge_deletes_all_installations(self, objects, atomic):
         objects.count.return_value = 12
-        objects.all.return_value.delete.return_value = (12, {"netbox_cots.Installation": 12})
+        objects.all.return_value.delete.return_value = (12, {"netbox_cots.RoleAssignment": 12})
         atomic.return_value.__enter__ = MagicMock()
         atomic.return_value.__exit__ = MagicMock(return_value=False)
         result = PurgeInstallationsView.as_view()(self.request("post", {"confirmation": "SUPPRIMER"}))

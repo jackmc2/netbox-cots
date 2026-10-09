@@ -1,7 +1,6 @@
 from collections import Counter
 
-from dcim.models import Device
-from virtualization.models import VirtualMachine
+from dcim.models import DeviceRole
 from extras.models import Tag
 from django.core.exceptions import ValidationError
 from django.contrib.contenttypes.models import ContentType
@@ -10,31 +9,29 @@ from django.utils.text import slugify
 from netbox.context import events_queue
 
 from .csv_parser import ImportFailure, parse_csv
-from .models import Application, SoftwareVersion, Installation
+from .models import Application, SoftwareVersion, RoleAssignment
 
 
-def resolve_machine(row):
-    model = Device if row.machine_type == "device" else VirtualMachine
-    query = model.objects.filter(pk=row.machine_id) if row.machine_id else model.objects.filter(name=row.machine)
-    matches = list(query[:2])
-    if len(matches) != 1:
-        raise ImportFailure(f"Ligne {row.line} : machine inconnue ou ambiguë ({row.machine_type} / {row.machine or row.machine_id}). Utiliser machine_id en cas de doublon de nom.")
-    machine = matches[0]
-    if row.machine_id and row.machine and machine.name != row.machine:
-        raise ImportFailure(f"Ligne {row.line} : machine_id et machine ne correspondent pas.")
-    return machine
+def resolve_role(row):
+    query = DeviceRole.objects.filter(pk=row.role_id) if row.role_id else DeviceRole.objects.filter(slug=row.role)
+    role = query.first()
+    if role is None:
+        raise ImportFailure(f"Ligne {row.line} : rôle inconnu ({row.role or row.role_id}). Créer le rôle dans NetBox avant l’import.")
+    if row.role_id and row.role and role.slug != row.role:
+        raise ImportFailure(f"Ligne {row.line} : role_id et role ne correspondent pas.")
+    return role
 
 
 def import_csv(text, *, dry_run=True, max_rows=10000):
     """Atomic upsert. Only call from the superuser-only view or trusted CLI.
 
-    No deletions. Locks selected machines in a deterministic order to serialize
-    concurrent imports for the same targets. Database constraints protect other
+    No deletions. Locks selected roles in a deterministic order to serialize
+    concurrent imports for the same roles. Database constraints protect other
     write paths too. An error, including a name collision, rolls back all rows.
     """
     rows = parse_csv(text, max_rows=max_rows)
-    counts = Counter(applications_created=0, versions_created=0, installations_created=0,
-                     installations_updated=0, unchanged=0, duplicates=0, tags_created=0, tags_added=0)
+    counts = Counter(applications_created=0, versions_created=0, assignments_created=0,
+                     assignments_updated=0, unchanged=0, duplicates=0, tags_created=0, tags_added=0)
     details = []
     created_tags = []
     current_line = None
@@ -42,16 +39,15 @@ def import_csv(text, *, dry_run=True, max_rows=10000):
     completed = False
     try:
         with transaction.atomic():
-            resolved = [(row, resolve_machine(row)) for row in rows]
-            locks = sorted({(row.machine_type, machine.pk) for row, machine in resolved})
-            for kind, pk in locks:
-                model = Device if kind == "device" else VirtualMachine
-                model.objects.select_for_update().get(pk=pk)
+            resolved = [(row, resolve_role(row)) for row in rows]
+            locks = sorted({role.pk for row, role in resolved})
+            for pk in locks:
+                DeviceRole.objects.select_for_update().get(pk=pk)
             seen = {}
             app_cache = {}
             version_cache = {}
             tag_cache = {}
-            for row, machine in resolved:
+            for row, role in resolved:
                 current_line = row.line
                 slug = row.cots_slug or slugify(row.cots)
                 if not slug or len(slug) > 100:
@@ -69,10 +65,10 @@ def import_csv(text, *, dry_run=True, max_rows=10000):
                     raise ImportFailure(f"Ligne {row.line} : l'identifiant {slug} désigne déjà {app.name}. Choisir un identifiant distinct.")
                 if row.publisher and app.publisher != row.publisher:
                     raise ImportFailure(f"Ligne {row.line} : éditeur différent pour {app.name}. Corriger la fiche COTS avant l'import.")
-                key = (row.machine_type, machine.pk, app.pk)
+                key = (role.pk, app.pk)
                 if key in seen:
                     if seen[key] != (row.version, row.tags):
-                        raise ImportFailure(f"Ligne {row.line} : versions ou tags différents du même COTS sur la même machine dans le fichier.")
+                        raise ImportFailure(f"Ligne {row.line} : versions ou tags différents du même COTS sur le même rôle dans le fichier.")
                     counts["duplicates"] += 1
                     continue
                 seen[key] = (row.version, row.tags)
@@ -95,9 +91,9 @@ def import_csv(text, *, dry_run=True, max_rows=10000):
                             counts["tags_created"] += 1
                         tag_cache[name] = tag
                         if tag.object_types.exists() and not tag.object_types.filter(
-                            app_label=Installation._meta.app_label, model=Installation._meta.model_name
+                            app_label=RoleAssignment._meta.app_label, model=RoleAssignment._meta.model_name
                         ).exists():
-                            raise ImportFailure(f"Ligne {row.line} : le tag {name} n’est pas autorisé pour les installations COTS.")
+                            raise ImportFailure(f"Ligne {row.line} : le tag {name} n’est pas autorisé pour les affectations COTS aux rôles.")
                     tags.append(tag)
                 version_key = (app.pk, row.version)
                 version = version_cache.get(version_key)
@@ -109,23 +105,22 @@ def import_csv(text, *, dry_run=True, max_rows=10000):
                         version.save()
                         counts["versions_created"] += 1
                     version_cache[version_key] = version
-                target = {"device": machine} if row.machine_type == "device" else {"virtual_machine": machine}
-                installation = Installation.objects.select_for_update().filter(application=app, **target).first()
+                installation = RoleAssignment.objects.select_for_update().filter(application=app, role=role).first()
                 old = installation.software_version.version if installation else None
                 before_tags = list(installation.tags.order_by("name").values_list("name", flat=True)) if installation and tags else []
                 existing_tag_ids = set(installation.tags.values_list("pk", flat=True)) if installation and tags else set()
                 added_tags = [tag for tag in tags if tag.pk not in existing_tag_ids]
                 if installation is None:
-                    installation = Installation(software_version=version, **target)
+                    installation = RoleAssignment(software_version=version, role=role)
                     installation.save()
                     action = "created"
-                    counts["installations_created"] += 1
+                    counts["assignments_created"] += 1
                 elif installation.software_version_id != version.pk or added_tags:
                     installation.snapshot()
                     installation.software_version = version
                     installation.save()
                     action = "updated"
-                    counts["installations_updated"] += 1
+                    counts["assignments_updated"] += 1
                 else:
                     action = "unchanged"
                     counts["unchanged"] += 1
@@ -133,7 +128,7 @@ def import_csv(text, *, dry_run=True, max_rows=10000):
                     installation.tags.add(*added_tags)
                     counts["tags_added"] += len(added_tags)
                 if len(details) < 100:
-                    details.append({"machine": str(machine), "cots": app.name, "before": old or "-", "after": row.version, "action": action,
+                    details.append({"role": str(role), "cots": app.name, "before": old or "-", "after": row.version, "action": action,
                                     "tags_added": [tag.name for tag in added_tags],
                                     "tags_after": sorted(set(before_tags) | set(row.tags)) if tags else None})
             if dry_run:

@@ -12,7 +12,7 @@ from netbox_cots.importer import import_csv
 
 
 class Command(BaseCommand):
-    help = "Import atomique des installations COTS (simulation par défaut)."
+    help = "Import atomique des affectations COTS aux rôles (simulation par défaut)."
 
     def add_arguments(self, parser):
         parser.add_argument("file")

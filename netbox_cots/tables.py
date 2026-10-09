@@ -1,6 +1,6 @@
 import django_tables2 as tables
 from netbox.tables import NetBoxTable, columns
-from .models import Application, SoftwareVersion, Installation
+from .models import Application, SoftwareVersion, Installation, RoleAssignment
 
 
 class ApplicationTable(NetBoxTable):
@@ -35,3 +35,29 @@ class InstallationTable(NetBoxTable):
         model = Installation
         fields = ("pk", "id", "application", "software_version", "device", "virtual_machine", "notes", "tags", "actions")
         default_columns = ("software_version", "device", "virtual_machine", "notes", "tags", "actions")
+
+
+class RoleAssignmentTable(NetBoxTable):
+    role = tables.Column(linkify=True, verbose_name="Rôle")
+    application = tables.Column(linkify=True)
+    software_version = tables.Column(linkify=True, verbose_name="COTS / version")
+    tags = columns.TagColumn(url_name="plugins:netbox_cots:roleassignment_list")
+
+    class Meta(NetBoxTable.Meta):
+        model = RoleAssignment
+        fields = ("pk", "id", "role", "application", "software_version", "notes", "tags", "actions")
+        default_columns = ("role", "software_version", "notes", "tags", "actions")
+
+
+class InheritedCOTSTable(RoleAssignmentTable):
+    class Meta(RoleAssignmentTable.Meta):
+        fields = ("id", "role", "application", "software_version", "notes", "tags")
+        default_columns = ("role", "software_version", "notes", "tags")
+        exclude = ("pk", "actions")
+
+
+class LegacyInstallationTable(InstallationTable):
+    class Meta(InstallationTable.Meta):
+        fields = ("id", "application", "software_version", "device", "virtual_machine", "notes", "tags")
+        default_columns = ("software_version", "device", "virtual_machine", "notes", "tags")
+        exclude = ("pk", "actions")

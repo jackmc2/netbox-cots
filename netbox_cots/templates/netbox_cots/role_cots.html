@@ -1,0 +1,7 @@
+{% extends 'dcim/devicerole.html' %}
+{% load render_table from django_tables2 %}
+{% block content %}
+<div class="alert alert-info">Les appareils et VM portant ce rôle héritent des COTS ci-dessous, en lecture seule dans leurs fiches.</div>
+{% if perms.netbox_cots.add_roleassignment %}<a class="btn btn-primary mb-3" href="{% url 'plugins:netbox_cots:roleassignment_add' %}?role={{ object.pk }}">Affecter un COTS à ce rôle</a>{% endif %}
+<div class="card"><h2 class="card-header">COTS du rôle</h2>{% render_table table %}</div>
+{% endblock %}

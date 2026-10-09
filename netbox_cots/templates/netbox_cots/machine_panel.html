@@ -1,4 +1,4 @@
-<div class="card mb-3"><h2 class="card-header">COTS installés ({{ installation_count }})</h2>
-  {% include 'netbox_cots/installation_rows.html' %}
-  <div class="card-footer"><a href="{% url 'plugins:netbox_cots:installation_list' %}?{{ target_filter }}={{ object.pk }}">Liste complète et export</a></div>
+<div class="card mb-3"><h2 class="card-header">COTS hérités du rôle ({{ assignment_count }})</h2>
+{% include 'netbox_cots/role_assignment_rows.html' %}
+{% if role %}<div class="card-footer"><a href="{% url 'dcim:devicerole_cots' pk=role.pk %}">Consulter les COTS du rôle {{ role }}</a> — affectations héritées, sans modification par machine.</div>{% endif %}
 </div>
