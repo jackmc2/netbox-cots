@@ -1,5 +1,11 @@
 # Historique des versions
 
+## 0.2.2
+
+- Colonne Tags visible par défaut dans les listes Applications, Versions et Installations, avec les badges et filtres natifs NetBox.
+- Préchargement des tags pour les trois listes afin d’éviter une requête supplémentaire par ligne.
+- Aucune migration de base de données.
+
 ## 0.2.1
 
 - Ajout du menu « Vider les installations » pour supprimer toutes les associations machines/COTS/version, en conservant le catalogue et les machines.

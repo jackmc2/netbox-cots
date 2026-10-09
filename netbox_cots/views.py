@@ -21,7 +21,7 @@ from .models import Application, SoftwareVersion, Installation
 
 
 class ApplicationListView(generic.ObjectListView):
-    queryset = Application.objects.all()
+    queryset = Application.objects.all().prefetch_related("tags")
     table = tables.ApplicationTable
     filterset = filtersets.ApplicationFilterSet
     filterset_form = forms.ApplicationFilterForm
@@ -46,7 +46,7 @@ class ApplicationDeleteView(generic.ObjectDeleteView):
 
 
 class SoftwareVersionListView(generic.ObjectListView):
-    queryset = SoftwareVersion.objects.select_related("application")
+    queryset = SoftwareVersion.objects.select_related("application").prefetch_related("tags")
     table = tables.SoftwareVersionTable
     filterset = filtersets.SoftwareVersionFilterSet
     filterset_form = forms.SoftwareVersionFilterForm
@@ -72,7 +72,7 @@ class SoftwareVersionDeleteView(generic.ObjectDeleteView):
 
 
 class InstallationListView(generic.ObjectListView):
-    queryset = Installation.objects.select_related("application", "software_version", "device", "virtual_machine")
+    queryset = Installation.objects.select_related("application", "software_version", "device", "virtual_machine").prefetch_related("tags")
     table = tables.InstallationTable
     filterset = filtersets.InstallationFilterSet
     filterset_form = forms.InstallationFilterForm

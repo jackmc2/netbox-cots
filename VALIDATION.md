@@ -101,3 +101,7 @@ nouvelles dépendances sont des migrations core déjà appliquées dans cet éta
 Le wheel 0.2.1 fourni ajoute une vue de purge globale des installations, son template, son entrée de menu et quatre tests de contrôle de confirmation et de permissions. Les autres fichiers fonctionnels et les migrations sont inchangés par rapport à 0.2.0. La matrice 0.2.0 ci-dessus reste un historique de validation de cette version, pas une validation complète de la purge sur chaque version NetBox.
 
 Sur NetBox 4.7.2 : quatre tests de la nouvelle vue de purge et neuf tests du parcours d’import réussis avec RequestFactory, cache mémoire et mocks. Pas de suppression réelle sur une instance NetBox distante.
+
+## Mise à jour 0.2.2 : colonne Tags
+
+Chargement des trois colonnes TagColumn, présence dans les colonnes par défaut, rendu des badges et liens de filtrage, préchargement des tags vérifiés localement sur NetBox 4.4.0, 4.5.0, 4.6.0 et 4.7.2. Aucun changement des modèles ou des migrations. Vérifications de rendu isolées, sans instance PostgreSQL/Redis complète.

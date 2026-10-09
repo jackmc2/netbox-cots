@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "netbox-cots"
-version = "0.2.1"
+version = "0.2.2"
 description = "Catalogue COTS, versions et installations pour NetBox 4.4 à 4.7.2"
 readme = "README.md"
 requires-python = ">=3.10"

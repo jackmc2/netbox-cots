@@ -1,6 +1,6 @@
 # NetBox COTS — Guide d’utilisation
 
-**Plugin :** `netbox_cots` · **Version :** `0.2.1` · **NetBox compatible :** `4.4.0` à `4.7.2`
+**Plugin :** `netbox_cots` · **Version :** `0.2.2` · **NetBox compatible :** `4.4.0` à `4.7.2`
 
 Ce plugin recense les logiciels (COTS), leurs versions et leurs installations sur
 les machines physiques (`Device`) et les machines virtuelles (`VirtualMachine`)
@@ -11,11 +11,11 @@ Il ne collecte pas les logiciels sur les machines et ne les déploie pas. Les do
 proviennent des imports CSV, des saisies manuelles ou des écritures API. Ansible
 peut exploiter cet inventaire selon votre propre logique.
 
-Télécharger le [wheel 0.2.1](https://github.com/jackmc2/netbox-cots/releases/download/v0.2.1/netbox_cots-0.2.1-py3-none-any.whl).
+Télécharger le [wheel 0.2.2](https://github.com/jackmc2/netbox-cots/raw/refs/heads/main/packages/netbox_cots-0.2.2-py3-none-any.whl).
 
 ## Compatibilité du wheel unique
 
-Le fichier `netbox_cots-0.2.1-py3-none-any.whl` utilise le même code sur la plage
+Le fichier `netbox_cots-0.2.2-py3-none-any.whl` utilise le même code sur la plage
 **NetBox 4.4.0 à 4.7.2**. Aucune modification du code, du wheel ou de la version
 minimale n’est à effectuer sur chaque cible. NetBox refuse le chargement en
 dehors de cette plage. Python doit également satisfaire les prérequis de la
@@ -86,6 +86,12 @@ Les fiches des machines physiques et des VM comportent un onglet **COTS** ainsi
 qu’un panneau de résumé. Les fiches des versions présentent leurs installations.
 Les aperçus sont limités à 100 installations ; utiliser la liste Installations
 et ses filtres pour consulter l’ensemble.
+
+### Colonne Tags
+
+Les listes **Applications**, **Versions** et **Installations** affichent les tags NetBox propres à chaque objet, sous forme de badges cliquables. Un clic filtre la liste sur ce tag. Les tags se renseignent dans le formulaire de création ou de modification de l’objet.
+
+Les tags des machines et des applications ne sont pas automatiquement hérités par les installations. Si vous aviez personnalisé les colonnes d’une liste, utiliser **Configurer le tableau** pour activer la colonne **Tags**.
 
 ### Saisie manuelle
 
@@ -599,7 +605,7 @@ curl --fail-with-body --silent --show-error \
 Cette opération supprime l’association choisie ; elle ne désinstalle aucun
 logiciel sur la machine. Une réussite renvoie normalement HTTP 204 sans contenu.
 
-Il n’existe **pas d’endpoint REST d’import CSV** dans la version 0.2.1. Pour le
+Il n’existe **pas d’endpoint REST d’import CSV** dans la version 0.2.2. Pour le
 CSV, utiliser l’interface ou la commande d’administration ci-dessous.
 
 ## Import en ligne de commande
@@ -624,11 +630,11 @@ La commande suppose que l’opérateur possède déjà l’accès au serveur Net
 
 Pour l’application [Netbox de Casper Klein](https://github.com/casperklein/homeassistant-addons/tree/master/netbox).
 
-1. Déposer `netbox_cots-0.2.1-py3-none-any.whl` dans `/app_configs/0da538cf_netbox/`.
+1. Déposer `netbox_cots-0.2.2-py3-none-any.whl` dans `/app_configs/0da538cf_netbox/`.
 2. Dans le fichier `requirements.txt` de ce dossier, ajouter cette ligne, ou remplacer la ligne de l’ancienne version :
 
 ```text
-/config/netbox_cots-0.2.1-py3-none-any.whl
+/config/netbox_cots-0.2.2-py3-none-any.whl
 ```
 
 Le chemin `/config/` est celui vu depuis l’application NetBox. Conserver les
@@ -646,7 +652,7 @@ Si le plugin est déjà déclaré, ne pas ajouter une seconde fois cette ligne.
 5. Consulter le journal : installation du paquet, migrations éventuelles, puis démarrage de NetBox.
 6. Ouvrir NetBox et actualiser la page.
 
-Le passage de 0.1.0 à 0.2.1 ne nécessite pas de nouvelle migration du plugin.
+Le passage de 0.1.0 à 0.2.2 ne nécessite pas de nouvelle migration du plugin.
 L’application HAOS prend en charge l’installation des requirements et les
 migrations nécessaires au démarrage.
 
@@ -704,7 +710,7 @@ depuis un autre dossier : vous risqueriez d’agir sur un autre projet Compose.
 | Fichier, relatif au dossier du projet | Action |
 | --- | --- |
 | `.env` | Ajouter la référence de l’image de base, en conservant les autres variables |
-| `plugins/netbox_cots-0.2.1-py3-none-any.whl` | Copier le wheel téléchargé |
+| `plugins/netbox_cots-0.2.2-py3-none-any.whl` | Copier le wheel téléchargé |
 | `Dockerfile-Plugins` | Créer le fichier de construction de l’image |
 | `configuration/plugins.py` | Ajouter le plugin à la configuration NetBox |
 | `docker-compose.override.yml` | Définir l’image personnalisée pour le web et le worker |
@@ -758,12 +764,12 @@ mkdir -p plugins
 
 Copier le wheel téléchargé depuis votre ordinateur vers ce dossier sur le
 serveur Docker, par SFTP/SCP ou votre gestionnaire de fichiers. Le fichier doit
-rester nommé `netbox_cots-0.2.1-py3-none-any.whl` : ne pas le décompresser.
+rester nommé `netbox_cots-0.2.2-py3-none-any.whl` : ne pas le décompresser.
 
 Vérifier qu’il est présent :
 
 ```bash
-ls -l plugins/netbox_cots-0.2.1-py3-none-any.whl
+ls -l plugins/netbox_cots-0.2.2-py3-none-any.whl
 ```
 
 Si le fichier n’est pas trouvé, corriger le transfert avant de construire
@@ -778,9 +784,9 @@ ARG NETBOX_BASE_IMAGE
 FROM ${NETBOX_BASE_IMAGE}
 
 USER root
-COPY plugins/netbox_cots-0.2.1-py3-none-any.whl /opt/netbox/plugins/
+COPY plugins/netbox_cots-0.2.2-py3-none-any.whl /opt/netbox/plugins/
 RUN /usr/local/bin/uv pip install --python /opt/netbox/venv/bin/python \
-    /opt/netbox/plugins/netbox_cots-0.2.1-py3-none-any.whl
+    /opt/netbox/plugins/netbox_cots-0.2.2-py3-none-any.whl
 
 USER netbox
 ```
@@ -794,7 +800,7 @@ image provenant d’un autre fournisseur, vérifier son environnement Python et 
 utilisateur. Le paquet est installé **à la construction de l’image**, ce qui
 le conserve lors d’une recréation du conteneur.
 
-Le plugin 0.2.1 contient des templates mais aucun fichier statique propre ;
+Le plugin 0.2.2 contient des templates mais aucun fichier statique propre ;
 aucune étape `collectstatic` supplémentaire n’est nécessaire pour ce paquet.
 
 ### 3. Déclarer le plugin
@@ -841,7 +847,7 @@ Utiliser des espaces, pas des tabulations, pour l’indentation YAML :
 ```yaml
 services:
   netbox:
-    image: netbox-cots-local:cots-0.2.1
+    image: netbox-cots-local:cots-0.2.2
     pull_policy: never
     build:
       context: .
@@ -850,11 +856,11 @@ services:
         NETBOX_BASE_IMAGE: ${NETBOX_BASE_IMAGE:?Définir NETBOX_BASE_IMAGE dans .env}
 
   netbox-worker:
-    image: netbox-cots-local:cots-0.2.1
+    image: netbox-cots-local:cots-0.2.2
     pull_policy: never
 ```
 
-`netbox-cots-local:cots-0.2.1` est le nom **local** choisi pour l’image à
+`netbox-cots-local:cots-0.2.2` est le nom **local** choisi pour l’image à
 construire ; ce n’est pas une image à télécharger sur Docker Hub.
 
 Le web et le worker doivent charger le même plugin et la même configuration.
@@ -884,7 +890,7 @@ docker compose build netbox
 
 `config -q` ne produit normalement aucun texte en cas de réussite. S’il indique
 une erreur, corriger le YAML ou la variable manquante avant de continuer.
-`build netbox` doit se terminer sans erreur et installer `netbox-cots==0.2.1`.
+`build netbox` doit se terminer sans erreur et installer `netbox-cots==0.2.2`.
 La construction seule ne remplace pas les conteneurs en fonctionnement.
 
 Contrôler le paquet dans l’image construite, sans lancer le serveur ni migrer :
@@ -893,7 +899,7 @@ Contrôler le paquet dans l’image construite, sans lancer le serveur ni migrer
 docker compose run --rm --no-deps netbox /opt/netbox/venv/bin/python -c "from importlib.metadata import version; print(version('netbox-cots'))"
 ```
 
-Résultat attendu : `0.2.1`. Cette commande exécute Python dans un conteneur
+Résultat attendu : `0.2.2`. Cette commande exécute Python dans un conteneur
 temporaire utilisant l’image sélectionnée par Compose, puis le supprime.
 
 Quand la construction réussit, arrêter le worker puis recréer le web avec sa
@@ -945,7 +951,7 @@ netbox_cots
 ```
 
 Sur une mise à jour d’une version 0.1.x, la migration est déjà cochée : il n’y a
-pas de nouvelle migration de schéma dans 0.2.1. Ne pas réinitialiser cet état.
+pas de nouvelle migration de schéma dans 0.2.2. Ne pas réinitialiser cet état.
 
 Après réussite, recréer le worker et vérifier son journal :
 
@@ -973,7 +979,7 @@ docker compose exec netbox /opt/netbox/venv/bin/python -c "from importlib.metada
 docker compose exec netbox-worker /opt/netbox/venv/bin/python -c "from importlib.metadata import version; print(version('netbox-cots'))"
 ```
 
-Les deux commandes doivent afficher `0.2.1`. Un worker sans le paquet ou chargé
+Les deux commandes doivent afficher `0.2.2`. Un worker sans le paquet ou chargé
 avec une autre image doit être corrigé et recréé.
 
 Connecté comme superutilisateur, ouvrir **COTS → Applications**, puis
@@ -1084,4 +1090,4 @@ par cette version et ne fait pas partie de ces paramètres.
 - [Source de NetBox 4.7.2](https://github.com/netbox-community/netbox/tree/v4.7.2)
 - [Documentation de l’application Netbox HAOS](https://github.com/casperklein/homeassistant-addons/blob/master/netbox/README.md)
 
-Les exemples décrivent le comportement du code de **netbox_cots 0.2.1**.
+Les exemples décrivent le comportement du code de **netbox_cots 0.2.2**.
