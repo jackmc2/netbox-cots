@@ -1,0 +1,4 @@
+<div class="card mb-3"><h2 class="card-header">COTS installés ({{ installation_count }})</h2>
+  {% include 'netbox_cots/installation_rows.html' %}
+  <div class="card-footer"><a href="{% url 'plugins:netbox_cots:installation_list' %}?{{ target_filter }}={{ object.pk }}">Liste complète et export</a></div>
+</div>

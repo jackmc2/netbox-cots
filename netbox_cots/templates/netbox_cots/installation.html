@@ -1,0 +1,8 @@
+{% extends 'generic/object.html' %}
+{% block content %}
+<div class="card"><h2 class="card-header">Installation recensée</h2><table class="table attr-table">
+  <tr><th>Machine</th><td><a href="{{ object.machine.get_absolute_url }}">{{ object.machine }}</a></td></tr>
+  <tr><th>COTS / version</th><td><a href="{{ object.software_version.get_absolute_url }}">{{ object.software_version }}</a></td></tr>
+  <tr><th>Notes</th><td>{{ object.notes|default:'-' }}</td></tr>
+</table></div>
+{% endblock %}

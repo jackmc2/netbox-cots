@@ -1,0 +1,8 @@
+<div class="table-responsive"><table class="table table-hover mb-0">
+  <thead><tr><th>Machine</th><th>COTS</th><th>Version</th></tr></thead>
+  <tbody>{% for installation in installations %}<tr>
+    <td><a href="{{ installation.machine.get_absolute_url }}">{{ installation.machine }}</a></td>
+    <td><a href="{{ installation.application.get_absolute_url }}">{{ installation.application }}</a></td>
+    <td><a href="{{ installation.get_absolute_url }}">{{ installation.software_version.version }}</a></td>
+  </tr>{% empty %}<tr><td colspan="3">Aucune installation visible.</td></tr>{% endfor %}</tbody>
+</table></div>

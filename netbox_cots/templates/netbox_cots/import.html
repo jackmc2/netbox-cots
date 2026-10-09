@@ -1,0 +1,33 @@
+{% extends 'base/layout.html' %}
+{% block title %}Import des installations COTS{% endblock %}
+{% block content %}
+{% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+<div class="alert alert-info">Le CSV crée les COTS et versions manquants, puis ajoute ou actualise les installations. Aucune installation absente du fichier n'est supprimée. L'import est réservé aux superutilisateurs.</div>
+<div class="card mb-3"><h2 class="card-header">Importer un CSV</h2><div class="card-body">
+<p>En-tête minimal : <code>machine_type,machine,cots,version</code>. Types : <code>device</code> ou <code>virtual_machine</code>. Colonnes optionnelles : <code>machine_id,cots_slug,publisher</code>. Encodage UTF-8 ; séparateur virgule ou point-virgule.</p>
+<form method="post" enctype="multipart/form-data">{% csrf_token %}{{ form.as_p }}
+<button type="submit" class="btn btn-primary">Simuler l’import</button></form>
+<p class="mt-3 text-muted">L’analyse effectue toujours une simulation. Si elle réussit, cliquer sur Intégrer pour enregistrer les données sans renvoyer le fichier. Le CSV est conservé temporairement pendant 30 minutes ; les données sont revalidées lors de l’intégration.</p>
+</div></div>
+{% if preview_token %}
+<div class="card mb-3"><h2 class="card-header">Intégrer les données</h2><div class="card-body">
+<p>Le CSV analysé est conservé : aucun fichier à sélectionner à nouveau.</p>
+<form method="post">{% csrf_token %}
+<input type="hidden" name="action" value="apply">
+<input type="hidden" name="preview_token" value="{{ preview_token }}">
+<button type="submit" class="btn btn-success">Intégrer</button>
+<a href="{% url 'plugins:netbox_cots:csv_import' %}" class="btn btn-outline-secondary">Annuler</a>
+</form></div></div>
+{% endif %}
+{% if result %}
+<div class="alert {% if result.dry_run %}alert-warning{% else %}alert-success{% endif %}">
+{% if result.dry_run %}Simulation terminée : aucune donnée enregistrée.{% else %}Import terminé : données enregistrées.{% endif %}</div>
+<div class="card mb-3"><h2 class="card-header">Résultat</h2><div class="card-body">
+<p>{{ result.rows }} lignes : {{ result.counts.applications_created }} COTS créés, {{ result.counts.versions_created }} versions créées, {{ result.counts.installations_created }} installations créées, {{ result.counts.installations_updated }} mises à jour, {{ result.counts.unchanged }} inchangées, {{ result.counts.duplicates }} lignes identiques ignorées.</p>
+</div></div>
+<div class="card"><h2 class="card-header">Aperçu (100 premières installations)</h2><table class="table">
+<thead><tr><th>Machine</th><th>COTS</th><th>Avant</th><th>Après</th><th>Action</th></tr></thead><tbody>
+{% for row in result.details %}<tr><td>{{ row.machine }}</td><td>{{ row.cots }}</td><td>{{ row.before }}</td><td>{{ row.after }}</td><td>{{ row.action }}</td></tr>{% endfor %}
+</tbody></table></div>
+{% endif %}
+{% endblock %}

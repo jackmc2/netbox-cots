@@ -1,0 +1,11 @@
+{% extends 'generic/object.html' %}
+{% block content %}
+<div class="card mb-3"><h2 class="card-header">COTS / version</h2><table class="table attr-table">
+  <tr><th>COTS</th><td><a href="{{ object.application.get_absolute_url }}">{{ object.application }}</a></td></tr>
+  <tr><th>Version</th><td>{{ object.version }}</td></tr>
+</table></div>
+<div class="card"><h2 class="card-header">Machines ({{ installation_count }})</h2>
+  {% include 'netbox_cots/installation_rows.html' %}
+</div>
+<a class="btn btn-primary mt-3" href="{% url 'plugins:netbox_cots:installation_list' %}?software_version_id={{ object.pk }}">Liste complète et export</a>
+{% endblock %}
