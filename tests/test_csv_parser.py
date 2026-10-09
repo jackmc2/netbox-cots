@@ -62,6 +62,17 @@ class CSVParserTests(unittest.TestCase):
         with self.assertRaises(parser.ImportFailure):
             parser.parse_csv(self.header + "device,PC-1,Java,17\ndevice,PC-2,Java,17\n", max_rows=1)
 
+    def test_tags(self):
+        row = parser.parse_csv("machine_type,machine,cots,version,tags\ndevice,PC-1,Java,17,Production | Windows | Production\n")[0]
+        self.assertEqual(row.tags, ("Production", "Windows"))
+        self.assertEqual(parser.parse_csv(self.header + "device,PC-1,Java,17\n")[0].tags, ())
+
+    def test_invalid_tags(self):
+        header = "machine_type,machine,cots,version,tags\n"
+        for tags in ("A||B", "|A", "A|", "x" * 101, "|".join(str(i) for i in range(51))):
+            with self.subTest(tags=tags), self.assertRaises(parser.ImportFailure):
+                parser.parse_csv(header + "device,PC-1,Java,17," + tags + "\n")
+
 
 if __name__ == "__main__":
     unittest.main()

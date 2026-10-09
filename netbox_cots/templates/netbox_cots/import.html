@@ -4,7 +4,7 @@
 {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
 <div class="alert alert-info">Le CSV crée les COTS et versions manquants, puis ajoute ou actualise les installations. Aucune installation absente du fichier n'est supprimée. L'import est réservé aux superutilisateurs.</div>
 <div class="card mb-3"><h2 class="card-header">Importer un CSV</h2><div class="card-body">
-<p>En-tête minimal : <code>machine_type,machine,cots,version</code>. Types : <code>device</code> ou <code>virtual_machine</code>. Colonnes optionnelles : <code>machine_id,cots_slug,publisher</code>. Encodage UTF-8 ; séparateur virgule ou point-virgule.</p>
+<p>En-tête minimal : <code>machine_type,machine,cots,version</code>. Types : <code>device</code> ou <code>virtual_machine</code>. Colonnes optionnelles : <code>machine_id,cots_slug,publisher,tags</code>. Encodage UTF-8 ; séparateur virgule ou point-virgule. Les tags de l’installation sont séparés par <code>|</code> ; les tags existants sont conservés.</p>
 <form method="post" enctype="multipart/form-data">{% csrf_token %}{{ form.as_p }}
 <button type="submit" class="btn btn-primary">Simuler l’import</button></form>
 <p class="mt-3 text-muted">L’analyse effectue toujours une simulation. Si elle réussit, cliquer sur Intégrer pour enregistrer les données sans renvoyer le fichier. Le CSV est conservé temporairement pendant 30 minutes ; les données sont revalidées lors de l’intégration.</p>
@@ -24,10 +24,15 @@
 {% if result.dry_run %}Simulation terminée : aucune donnée enregistrée.{% else %}Import terminé : données enregistrées.{% endif %}</div>
 <div class="card mb-3"><h2 class="card-header">Résultat</h2><div class="card-body">
 <p>{{ result.rows }} lignes : {{ result.counts.applications_created }} COTS créés, {{ result.counts.versions_created }} versions créées, {{ result.counts.installations_created }} installations créées, {{ result.counts.installations_updated }} mises à jour, {{ result.counts.unchanged }} inchangées, {{ result.counts.duplicates }} lignes identiques ignorées.</p>
+<p>{% if result.dry_run %}{{ result.counts.tags_created }} tags à créer ; {{ result.counts.tags_added }} associations de tags à ajouter.{% else %}{{ result.counts.tags_created }} tags créés ; {{ result.counts.tags_added }} associations de tags ajoutées.{% endif %}</p>
+{% if result.created_tags %}
+<h3>{% if result.dry_run %}Tags qui seront créés lors de l’intégration{% else %}Tags créés{% endif %}</h3>
+<ul>{% for tag in result.created_tags %}<li>{{ tag.name }} — identifiant <code>{{ tag.slug }}</code></li>{% endfor %}</ul>
+{% endif %}
 </div></div>
 <div class="card"><h2 class="card-header">Aperçu (100 premières installations)</h2><table class="table">
-<thead><tr><th>Machine</th><th>COTS</th><th>Avant</th><th>Après</th><th>Action</th></tr></thead><tbody>
-{% for row in result.details %}<tr><td>{{ row.machine }}</td><td>{{ row.cots }}</td><td>{{ row.before }}</td><td>{{ row.after }}</td><td>{{ row.action }}</td></tr>{% endfor %}
+<thead><tr><th>Machine</th><th>COTS</th><th>Avant</th><th>Après</th><th>Action</th><th>Tags après import</th><th>Tags à ajouter</th></tr></thead><tbody>
+{% for row in result.details %}<tr><td>{{ row.machine }}</td><td>{{ row.cots }}</td><td>{{ row.before }}</td><td>{{ row.after }}</td><td>{{ row.action }}</td><td>{% if row.tags_after is None %}Conservés{% else %}{{ row.tags_after|join:", "|default:"—" }}{% endif %}</td><td>{{ row.tags_added|join:", "|default:"—" }}</td></tr>{% endfor %}
 </tbody></table></div>
 {% endif %}
 {% endblock %}

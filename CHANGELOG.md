@@ -1,5 +1,13 @@
 # Historique des versions
 
+## 0.2.3
+
+- Colonne CSV optionnelle `tags` avec noms séparés par `|`, affectée aux installations.
+- Création des tags absents à l’intégration, réutilisation des tags existants et conservation des associations déjà présentes.
+- Analyse : compteur et liste des tags à créer, tags ajoutés et aperçu des tags après import.
+- Contrôles de collisions de slug, restrictions de types d’objets et lignes en conflit ; rollback global et réimport sans doublons.
+- Tests du parseur et des relations complétés ; aucune migration de schéma.
+
 ## 0.2.2
 
 - Colonne Tags visible par défaut dans les listes Applications, Versions et Installations, avec les badges et filtres natifs NetBox.

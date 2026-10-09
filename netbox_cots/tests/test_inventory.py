@@ -4,6 +4,8 @@ from django.urls import reverse
 from dcim.models import Device, DeviceRole, DeviceType, Manufacturer, Site
 from virtualization.models import VirtualMachine
 from netbox.context import events_queue
+from extras.models import Tag, TaggedItem
+from django.contrib.contenttypes.models import ContentType
 
 from netbox_cots.csv_parser import ImportFailure
 from netbox_cots.importer import import_csv
@@ -136,3 +138,46 @@ class InventoryTests(TestCase):
         request.user = SimpleNamespace(is_authenticated=True, is_superuser=False)
         with self.assertRaises(PermissionDenied):
             CSVImportView.as_view()(request)
+
+    def tag_csv(self,tags='Production|Windows',version='8.8'):
+     return 'machine_type,machine,cots_slug,cots,version,tags\ndevice,PC-001,notepadpp,Notepad++,'+version+','+tags+'\n'
+    def test_tag_preview_and_apply(self):
+     r=import_csv(self.tag_csv())
+     self.assertEqual(r['counts']['tags_created'],2)
+     self.assertEqual({t['name'] for t in r['created_tags']},{'Production','Windows'})
+     self.assertEqual(Tag.objects.count(),0)
+     self.assertEqual(TaggedItem.objects.count(),0)
+     import_csv(self.tag_csv(),dry_run=False)
+     self.assertEqual(set(Installation.objects.get(device=self.device).tags.values_list('name',flat=True)),{'Production','Windows'})
+     r=import_csv(self.tag_csv(),dry_run=False)
+     self.assertEqual(r['counts']['tags_created'],0)
+     self.assertEqual(r['counts']['tags_added'],0)
+     self.assertEqual(r['counts']['unchanged'],1)
+    def test_preserve_add_blank_and_omit(self):
+     import_csv(self.tag_csv('Production'),dry_run=False)
+     r=import_csv(self.tag_csv('Windows'),dry_run=False)
+     self.assertEqual(r['counts']['installations_updated'],1)
+     self.assertEqual(r['counts']['tags_added'],1)
+     self.assertEqual(r['details'][0]['tags_after'],['Production','Windows'])
+     import_csv(self.tag_csv(''),dry_run=False)
+     import_csv('machine_type,machine,cots_slug,cots,version\ndevice,PC-001,notepadpp,Notepad++,8.8\n',dry_run=False)
+     self.assertEqual(Installation.objects.get(device=self.device).tags.count(),2)
+    def test_tag_reuse(self):
+     Tag.objects.create(name='Production',slug='custom-production')
+     r=import_csv(self.tag_csv('Production'),dry_run=False)
+     self.assertEqual(r['counts']['tags_created'],0)
+     self.assertEqual(Installation.objects.get(device=self.device).tags.get().slug,'custom-production')
+    def test_tags_rollback_and_collision(self):
+     with self.assertRaises(ImportFailure):
+      import_csv(self.tag_csv('Production')+'device,PC-001,notepadpp,Notepad++,8.8,Other\n',dry_run=False)
+     self.assertEqual(Tag.objects.count(),0)
+     self.assertEqual(Installation.objects.count(),0)
+     Tag.objects.create(name='Existing',slug='production')
+     with self.assertRaises(ImportFailure):import_csv(self.tag_csv('Production'),dry_run=False)
+     self.assertEqual(Tag.objects.count(),1)
+    def test_restricted_tag(self):
+     t=Tag.objects.create(name='Production',slug='production')
+     ct=ContentType.objects.get_for_model(Device)
+     t.object_types.add(ct)
+     with self.assertRaises(ImportFailure):import_csv(self.tag_csv('Production'),dry_run=False)
+     self.assertEqual(Installation.objects.count(),0)

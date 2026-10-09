@@ -105,3 +105,7 @@ Sur NetBox 4.7.2 : quatre tests de la nouvelle vue de purge et neuf tests du par
 ## Mise à jour 0.2.2 : colonne Tags
 
 Chargement des trois colonnes TagColumn, présence dans les colonnes par défaut, rendu des badges et liens de filtrage, préchargement des tags vérifiés localement sur NetBox 4.4.0, 4.5.0, 4.6.0 et 4.7.2. Aucun changement des modèles ou des migrations. Vérifications de rendu isolées, sans instance PostgreSQL/Redis complète.
+
+## Mise à jour 0.2.3 : tags CSV
+
+Neuf tests du parseur réussis, dont la validation des listes de tags. Cinq nouveaux scénarios relationnels vérifiés sous SQLite isolée sur chacune des versions NetBox 4.4.0, 4.5.0, 4.6.0 et 4.7.2 : simulation sans persistance puis application, réimport identique, conservation et ajout, réutilisation du tag existant, conflits/rollback et restrictions de types. Les contrôles relationnels existants réussissent également. Rendu de la liste des tags futurs et des associations dans la simulation vérifié sur 4.7.2. Cache de ContentType vidé lors du rollback pour éviter de réutiliser des références créées pendant une simulation. Aucun test de déploiement PostgreSQL/Redis complet.

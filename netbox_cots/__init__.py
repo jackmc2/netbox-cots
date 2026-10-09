@@ -5,7 +5,7 @@ class COTSConfig(PluginConfig):
     name = "netbox_cots"
     verbose_name = "Inventaire COTS"
     description = "Catalogue COTS, versions et installations sur machines et VM"
-    version = "0.2.2"
+    version = "0.2.3"
     base_url = "cots"
     min_version = "4.4.0"
     max_version = "4.7.2"
