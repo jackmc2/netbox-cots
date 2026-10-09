@@ -95,3 +95,9 @@ avec Redis. Les correctifs intermédiaires et Python 3.10/3.11 ne sont pas test�
 individuellement. L’abaissement des dépendances de la migration ne nécessite pas
 de nouvelle migration pour une installation 0.1.x sur NetBox 4.7.2 : toutes les
 nouvelles dépendances sont des migrations core déjà appliquées dans cet état.
+
+## Mise à jour 0.2.1
+
+Le wheel 0.2.1 fourni ajoute une vue de purge globale des installations, son template, son entrée de menu et quatre tests de contrôle de confirmation et de permissions. Les autres fichiers fonctionnels et les migrations sont inchangés par rapport à 0.2.0. La matrice 0.2.0 ci-dessus reste un historique de validation de cette version, pas une validation complète de la purge sur chaque version NetBox.
+
+Sur NetBox 4.7.2 : quatre tests de la nouvelle vue de purge et neuf tests du parcours d’import réussis avec RequestFactory, cache mémoire et mocks. Pas de suppression réelle sur une instance NetBox distante.

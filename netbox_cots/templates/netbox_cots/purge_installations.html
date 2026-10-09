@@ -1,0 +1,25 @@
+{% extends 'base/layout.html' %}
+{% block title %}Vider les installations COTS{% endblock %}
+{% block content %}
+{% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+<div class="card border-danger">
+  <h2 class="card-header text-danger">Vider les installations COTS / Versions</h2>
+  <div class="card-body">
+    <div class="alert alert-warning">
+      Cette opération supprime <strong>toutes les associations entre les machines et les COTS/versions</strong>.
+      Elle ne supprime pas le catalogue des COTS ni les objets Version.
+    </div>
+    <p><strong>{{ installation_count }}</strong> installation(s) seront supprimée(s).</p>
+    <p>Cette opération est irréversible. Pour confirmer, saisir <code>{{ confirmation_text }}</code>.</p>
+    <form method="post">
+      {% csrf_token %}
+      <div class="mb-3">
+        <label class="form-label" for="confirmation">Confirmation</label>
+        <input class="form-control" id="confirmation" name="confirmation" autocomplete="off" required>
+      </div>
+      <button type="submit" class="btn btn-danger">Vider les installations</button>
+      <a href="{% url 'plugins:netbox_cots:installation_list' %}" class="btn btn-outline-secondary">Annuler</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

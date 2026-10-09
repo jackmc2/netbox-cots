@@ -2,9 +2,11 @@ import secrets
 
 from django.conf import settings
 from django.core.cache import cache
+from django.contrib import messages
+from django.db import transaction
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.views import View
 from netbox.views import generic
 from netbox.object_actions import AddObject, BulkExport
@@ -191,3 +193,37 @@ class CSVImportView(LoginRequiredMixin, View):
         return render(request, "netbox_cots/import.html", {
             "form": form, "result": result, "preview_token": retry_token, "error": error,
         })
+
+
+class PurgeInstallationsView(LoginRequiredMixin, View):
+    """Delete all COTS installations while preserving the COTS/version catalogue."""
+
+    template_name = "netbox_cots/purge_installations.html"
+    confirmation_text = "SUPPRIMER"
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and not request.user.is_superuser:
+            raise PermissionDenied("La purge des installations COTS est réservée aux superutilisateurs.")
+        return super().dispatch(request, *args, **kwargs)
+
+    def get(self, request):
+        return render(request, self.template_name, {
+            "installation_count": Installation.objects.count(),
+            "confirmation_text": self.confirmation_text,
+        })
+
+    def post(self, request):
+        installation_count = Installation.objects.count()
+        if request.POST.get("confirmation", "").strip() != self.confirmation_text:
+            return render(request, self.template_name, {
+                "installation_count": installation_count,
+                "confirmation_text": self.confirmation_text,
+                "error": f"Saisir {self.confirmation_text} pour confirmer la suppression.",
+            })
+        with transaction.atomic():
+            deleted_count, _ = Installation.objects.all().delete()
+        messages.success(
+            request,
+            f"Purge terminée : {deleted_count} installation(s) COTS supprimée(s). Le catalogue COTS et les versions sont conservés.",
+        )
+        return redirect("plugins:netbox_cots:installation_list")

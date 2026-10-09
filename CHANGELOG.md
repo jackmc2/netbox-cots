@@ -1,5 +1,12 @@
 # Historique des versions
 
+## 0.2.1
+
+- Ajout du menu « Vider les installations » pour supprimer toutes les associations machines/COTS/version, en conservant le catalogue et les machines.
+- Purge réservée aux superutilisateurs, par POST avec CSRF, transaction et confirmation « SUPPRIMER ».
+- Quatre tests de confirmation et de permissions ajoutés ; treize tests du parcours d’import et de purge réussis localement sur NetBox 4.7.2 avec mocks.
+- Documentation actualisée, avec conservation des instructions Docker détaillées.
+
 ## 0.2.0
 
 - Compatibilité déclarée avec NetBox 4.4.0 à 4.7.2 inclus, avec un wheel unique.
